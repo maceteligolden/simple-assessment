@@ -1,0 +1,4 @@
+// Shared model classes
+
+export {};
+
