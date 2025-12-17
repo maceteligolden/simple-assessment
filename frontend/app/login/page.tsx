@@ -4,18 +4,19 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import LoginForm from '@/components/auth/LoginForm'
 import { useAuth } from '@/hooks/api'
+import { BYPASS_AUTH } from '@/constants/test.constants'
 
 export default function LoginPage() {
   const router = useRouter()
   const { isAuthenticated } = useAuth()
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!BYPASS_AUTH && isAuthenticated) {
       router.push('/dashboard')
     }
   }, [isAuthenticated, router])
 
-  if (isAuthenticated) {
+  if (!BYPASS_AUTH && isAuthenticated) {
     return null
   }
 

@@ -1,59 +1,72 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { useAuth } from '@/hooks/api'
+import { Navbar } from '@/components/layout'
+import { ExamList } from '@/components/dashboard'
+import { useAuth, useExams } from '@/hooks/api'
+import { BYPASS_AUTH } from '@/constants/test.constants'
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { user, isAuthenticated, logout } = useAuth()
+  const { user, isAuthenticated } = useAuth()
+  const { exams, isLoading, error } = useExams()
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (mounted && !BYPASS_AUTH && !isAuthenticated) {
       router.push('/')
     }
-  }, [isAuthenticated, router])
+  }, [mounted, isAuthenticated, router])
 
-  const handleLogout = () => {
-    logout()
-    router.push('/')
+  if (!mounted) {
+    return null
   }
 
-  if (!isAuthenticated || !user) {
+  if (!BYPASS_AUTH && (!isAuthenticated || !user)) {
     return null
   }
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">
-              Welcome back, {user.firstName} {user.lastName}!
-            </p>
-          </div>
-          <Button onClick={handleLogout} variant="outline">
-            Logout
-          </Button>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <Navbar />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            {BYPASS_AUTH
+              ? 'Welcome! (Test Mode - Auth Bypassed)'
+              : `Welcome back, ${user?.firstName} ${user?.lastName}!`}
+          </p>
         </div>
 
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">User Information</h2>
-          <div className="space-y-2">
-            <p>
-              <span className="font-medium">Email:</span> {user.email}
-            </p>
-            <p>
-              <span className="font-medium">Name:</span> {user.firstName}{' '}
-              {user.lastName}
-            </p>
-          </div>
-        </Card>
-      </div>
-    </main>
+        <div className="mb-6 flex gap-4">
+          <Link href="/dashboard/exams/create">
+            <Button>Create New Exam</Button>
+          </Link>
+          <Link href="/dashboard/exams/start">
+            <Button variant="outline">Start an Exam</Button>
+          </Link>
+        </div>
+
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold mb-4">My Exams</h2>
+          {error && (
+            <div className="mb-4 p-4 bg-red-100 dark:bg-red-900 border border-red-400 text-red-700 dark:text-red-300 rounded">
+              {error}
+            </div>
+          )}
+          <ExamList exams={exams} isLoading={isLoading} />
+        </div>
+      </main>
+    </div>
   )
 }
 

@@ -6,18 +6,19 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAuth } from '@/hooks/api'
+import { BYPASS_AUTH } from '@/constants/test.constants'
 
 export default function Home() {
   const router = useRouter()
   const { isAuthenticated } = useAuth()
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!BYPASS_AUTH && isAuthenticated) {
       router.push('/dashboard')
     }
   }, [isAuthenticated, router])
 
-  if (isAuthenticated) {
+  if (!BYPASS_AUTH && isAuthenticated) {
     return null
   }
 
