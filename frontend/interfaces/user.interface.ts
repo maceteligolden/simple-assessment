@@ -1,7 +1,8 @@
 export interface User {
   id: string
   email: string
-  name: string
+  firstName: string
+  lastName: string
   createdAt: string
   updatedAt: string
 }
@@ -17,8 +18,9 @@ export interface LoginCredentials {
 }
 
 export interface RegisterData {
+  firstName: string
+  lastName: string
   email: string
   password: string
-  name: string
 }
 
