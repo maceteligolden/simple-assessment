@@ -1,5 +1,5 @@
-import { HTTP_STATUS } from '../constants';
-import { BaseError } from './base-error';
+import { HTTP_STATUS } from '../constants'
+import { BaseError } from './base-error'
 
 /**
  * Conflict Error
@@ -7,8 +7,7 @@ import { BaseError } from './base-error';
  */
 export class ConflictError extends BaseError {
   constructor(message = 'Conflict', details?: unknown) {
-    super(message, HTTP_STATUS.CONFLICT, true, details);
-    this.name = 'ConflictError';
+    super(message, HTTP_STATUS.CONFLICT, true, details)
+    this.name = 'ConflictError'
   }
 }
-

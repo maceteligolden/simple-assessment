@@ -1,5 +1,5 @@
-import { HTTP_STATUS } from '../constants';
-import { BaseError } from './base-error';
+import { HTTP_STATUS } from '../constants'
+import { BaseError } from './base-error'
 
 /**
  * Unprocessable Entity Error
@@ -7,8 +7,7 @@ import { BaseError } from './base-error';
  */
 export class UnprocessableEntityError extends BaseError {
   constructor(message = 'Unprocessable Entity', details?: unknown) {
-    super(message, HTTP_STATUS.UNPROCESSABLE_ENTITY, true, details);
-    this.name = 'UnprocessableEntityError';
+    super(message, HTTP_STATUS.UNPROCESSABLE_ENTITY, true, details)
+    this.name = 'UnprocessableEntityError'
   }
 }
-

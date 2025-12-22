@@ -2,7 +2,14 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Pagination } from '@/components/ui/pagination'
@@ -11,11 +18,16 @@ import { Exam } from '@/interfaces'
 interface ExamListProps {
   exams: Exam[]
   isLoading?: boolean
+  showResultsButton?: boolean // If true, shows "View Results" instead of "Start Exam"
 }
 
 const ITEMS_PER_PAGE = 6
 
-export default function ExamList({ exams, isLoading }: ExamListProps) {
+export default function ExamList({
+  exams,
+  isLoading,
+  showResultsButton = false,
+}: ExamListProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
 
@@ -26,13 +38,16 @@ export default function ExamList({ exams, isLoading }: ExamListProps) {
 
     const query = searchQuery.toLowerCase()
     return exams.filter(
-      (exam) =>
+      exam =>
         exam.title.toLowerCase().includes(query) ||
         exam.description?.toLowerCase().includes(query)
     )
   }, [exams, searchQuery])
 
-  const totalPages = Math.max(1, Math.ceil(filteredExams.length / ITEMS_PER_PAGE))
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredExams.length / ITEMS_PER_PAGE)
+  )
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const paginatedExams = filteredExams.slice(
     startIndex,
@@ -84,7 +99,7 @@ export default function ExamList({ exams, isLoading }: ExamListProps) {
           type="text"
           placeholder="Search exams by title or description..."
           value={searchQuery}
-          onChange={(e) => {
+          onChange={e => {
             setSearchQuery(e.target.value)
             setCurrentPage(1) // Reset to first page on search
           }}
@@ -95,13 +110,13 @@ export default function ExamList({ exams, isLoading }: ExamListProps) {
       {filteredExams.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-gray-600 dark:text-gray-400">
-            No exams found matching "{searchQuery}"
+            No exams found matching &quot;{searchQuery}&quot;
           </p>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {paginatedExams.map((exam) => (
+            {paginatedExams.map(exam => (
               <Card key={exam.id} className="flex flex-col">
                 <CardHeader>
                   <CardTitle className="line-clamp-2">{exam.title}</CardTitle>
@@ -130,17 +145,31 @@ export default function ExamList({ exams, isLoading }: ExamListProps) {
                   </div>
                 </CardContent>
                 <CardFooter className="flex gap-2">
-                  <Link href={`/dashboard/exams/${exam.id}`} className="flex-1">
-                    <Button variant="outline" className="w-full">
-                      View Details
-                    </Button>
-                  </Link>
-                  <Link
-                    href={`/dashboard/exams/${exam.id}/start`}
-                    className="flex-1"
-                  >
-                    <Button className="w-full">Start Exam</Button>
-                  </Link>
+                  {showResultsButton ? (
+                    <Link
+                      href={`/dashboard/exams/${exam.id}/results`}
+                      className="w-full"
+                    >
+                      <Button className="w-full">View Results</Button>
+                    </Link>
+                  ) : (
+                    <>
+                      <Link
+                        href={`/dashboard/exams/${exam.id}`}
+                        className="flex-1"
+                      >
+                        <Button variant="outline" className="w-full">
+                          View Details
+                        </Button>
+                      </Link>
+                      <Link
+                        href={`/dashboard/exams/${exam.id}/edit`}
+                        className="flex-1"
+                      >
+                        <Button className="w-full">Edit Exam</Button>
+                      </Link>
+                    </>
+                  )}
                 </CardFooter>
               </Card>
             ))}
@@ -158,4 +187,3 @@ export default function ExamList({ exams, isLoading }: ExamListProps) {
     </div>
   )
 }
-

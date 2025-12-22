@@ -1,13 +1,13 @@
-import { HTTP_STATUS, HttpStatusCode } from '../constants';
+import { HTTP_STATUS, HttpStatusCode } from '../constants'
 
 /**
  * Base Error Class
  * All custom errors should extend this class
  */
 export class BaseError extends Error {
-  public readonly statusCode: HttpStatusCode;
-  public readonly isOperational: boolean;
-  public readonly details?: unknown;
+  public readonly statusCode: HttpStatusCode
+  public readonly isOperational: boolean
+  public readonly details?: unknown
 
   constructor(
     message: string,
@@ -15,13 +15,12 @@ export class BaseError extends Error {
     isOperational = true,
     details?: unknown
   ) {
-    super(message);
-    this.statusCode = statusCode;
-    this.isOperational = isOperational;
-    this.details = details;
+    super(message)
+    this.statusCode = statusCode
+    this.isOperational = isOperational
+    this.details = details
 
     // Maintains proper stack trace for where our error was thrown
-    Error.captureStackTrace(this, this.constructor);
+    Error.captureStackTrace(this, this.constructor)
   }
 }
-

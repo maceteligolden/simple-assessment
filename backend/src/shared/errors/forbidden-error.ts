@@ -1,5 +1,5 @@
-import { HTTP_STATUS } from '../constants';
-import { BaseError } from './base-error';
+import { HTTP_STATUS } from '../constants'
+import { BaseError } from './base-error'
 
 /**
  * Forbidden Error
@@ -7,8 +7,7 @@ import { BaseError } from './base-error';
  */
 export class ForbiddenError extends BaseError {
   constructor(message = 'Forbidden', details?: unknown) {
-    super(message, HTTP_STATUS.FORBIDDEN, true, details);
-    this.name = 'ForbiddenError';
+    super(message, HTTP_STATUS.FORBIDDEN, true, details)
+    this.name = 'ForbiddenError'
   }
 }
-

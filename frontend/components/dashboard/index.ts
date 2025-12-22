@@ -1,2 +1,6 @@
 export { default as ExamList } from './ExamList'
-
+export { ExaminerDashboard } from './ExaminerDashboard'
+export { ParticipantDashboard } from './ParticipantDashboard'
+export { ExaminerMyExams } from './ExaminerMyExams'
+export { ParticipantMyExams } from './ParticipantMyExams'
+export { StatCard } from './StatCard'

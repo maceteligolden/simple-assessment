@@ -5,25 +5,24 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/api'
-import { BYPASS_AUTH } from '@/constants/test.constants'
 
 export default function Navbar() {
   const router = useRouter()
-  const { user, logout } = useAuth()
+  const { logout, isAuthenticated, user, isExaminer } = useAuth()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  const handleLogout = () => {
-    if (!BYPASS_AUTH) {
-      logout()
-      router.push('/')
-    } else {
-      // In test mode, just navigate without logout
-      router.push('/')
-    }
+  const handleLogout = async () => {
+    await logout()
+    router.replace('/login')
+  }
+
+  // Don't render navbar if user is not authenticated
+  if (!mounted || !isAuthenticated) {
+    return null
   }
 
   return (
@@ -37,30 +36,31 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-4">
-            <Link href="/dashboard/exams/create">
-              <Button variant="outline" size="sm">
-                Create Exam
-              </Button>
-            </Link>
+            {mounted && isExaminer && (
+              <Link href="/dashboard/exams/create">
+                <Button variant="outline" size="sm">
+                  Create Exam
+                </Button>
+              </Link>
+            )}
 
-            <Link href="/dashboard/exams/start">
-              <Button size="sm">Start Exam</Button>
-            </Link>
+            {mounted && !isExaminer && (
+              <Link href="/dashboard/exams/start">
+                <Button size="sm">Start Exam</Button>
+              </Link>
+            )}
 
-            <Link href="/dashboard/results">
+            <Link href="/dashboard/my-exams">
               <Button variant="ghost" size="sm">
-                My Results
+                My Exams
               </Button>
             </Link>
-
             {mounted && (
               <div className="flex items-center gap-2 border-l pl-4 ml-2">
                 <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {BYPASS_AUTH
-                    ? 'Test User'
-                    : user?.firstName && user?.lastName
-                      ? `${user.firstName} ${user.lastName}`
-                      : 'User'}
+                  {user?.firstName && user?.lastName
+                    ? `${user.firstName} ${user.lastName}`
+                    : 'User'}
                 </span>
                 <Button variant="outline" size="sm" onClick={handleLogout}>
                   Logout

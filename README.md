@@ -2,23 +2,36 @@
 
 A minimal online exam and assessment platform built with Next.js and Express TypeScript. This project demonstrates a full-stack application for creating, delivering, and managing online exams.
 
+## 📚 Documentation
+
+- **[Quick Start Guide](./docs/quick-start.md)** - Get up and running quickly
+- **[Features Documentation](./docs/features.md)** - Comprehensive feature overview
+- **[Database Design](./docs/database-design.md)** - Database schema and data models
+
 ## 🚀 Features
 
 ### Core Features
-- **User Authentication**: Sign up, login, and secure session management
-- **Exam Creation**: Create exams with multiple question types (MCQ, short answer)
-- **Exam Delivery**: Take exams with timer functionality
-- **Basic Proctoring**: Browser focus detection and tab switching alerts
-- **Auto-Grading**: Automatic grading for multiple-choice questions
-- **Results Dashboard**: View exam results and analytics
-- **Exam History**: Track taken exams and scores
+- **User Authentication**: Sign up, login, logout, and secure session management with JWT tokens
+- **Role-Based Access**: Support for examiner and participant roles
+- **Exam Creation**: Create exams with configurable settings (duration, availability, randomization)
+- **Question Management**: Add, update, and delete questions (multiple choice supported)
+- **Participant Management**: Add participants by email, generate unique access codes
+- **Exam Delivery**: Take exams with timer functionality and sequential navigation
+- **Auto-Grading**: Automatic grading for multiple-choice questions with score calculation
+- **Results Dashboard**: View detailed exam results for examiners and participants
+- **Exam History**: Track taken exams, scores, and attempt status
+- **API Documentation**: Complete Swagger/OpenAPI documentation
 
 ### Technical Features
-- **Frontend**: Next.js 14 with TypeScript
-- **Backend**: Express.js with TypeScript
-- **Database**: MongoDB with Mongoose
+- **Frontend**: Next.js 14 with App Router, TypeScript, Tailwind CSS, Redux Toolkit
+- **Backend**: Express.js with TypeScript, Dependency Injection (tsyringe)
+- **Database**: MongoDB with Mongoose ODM
+- **Authentication**: JWT-based authentication with refresh tokens
+- **API Documentation**: Swagger/OpenAPI with interactive documentation
+- **Testing**: Vitest for unit testing
 - **Code Quality**: ESLint and Prettier configured
 - **Package Manager**: Yarn
+- **Logging**: Winston-based logging system
 
 ## 📋 Prerequisites
 
@@ -239,9 +252,15 @@ Contains reusable code used across the entire application:
 - **`repository/`** - Shared repository classes
 
 #### **Modules Folder** (`src/modules/`)
-Feature-specific modules (to be implemented):
-- Each module will contain its own routes, controllers, services, and models
-- Examples: `auth`, `exams`, `users`, etc.
+Feature-specific modules:
+- **`auth/`** - Authentication module with signup, signin, token refresh, and user search
+- **`exam/`** - Exam module with:
+  - Exam CRUD operations
+  - Question management
+  - Participant management
+  - Exam attempt handling
+  - Results and analytics
+- Each module contains its own routes, controllers, services, interfaces, and validation
 
 ### Frontend Architecture
 
@@ -250,6 +269,28 @@ The frontend follows Next.js 14 App Router conventions with:
 - **Custom hooks** for API calls and UI state management
 - **Redux** for global state management
 - **TypeScript** for type safety throughout
+
+## 🧪 Testing
+
+### Running Tests
+
+```bash
+# Backend tests
+cd backend
+yarn test                    # Run all tests
+yarn test:watch             # Run tests in watch mode
+yarn test test/shared/repository  # Run specific test suite
+yarn test test/modules/exam/services  # Run service tests
+```
+
+### Test Coverage
+
+The project includes comprehensive unit tests for:
+- **Repositories**: All database operations (create, read, update, delete)
+- **Services**: Business logic for exam, question, participant, and attempt services
+- **Validation**: Input validation schemas
+
+Tests are written using **Vitest** and follow best practices with proper mocking and isolation.
 
 ## 🧪 Code Quality
 
@@ -280,27 +321,84 @@ yarn format:check  # Check formatting
 
 ## 🎯 API Endpoints
 
-The backend API will provide the following endpoints (to be implemented):
+The backend API provides the following endpoints (all prefixed with `/api/v1`):
 
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-- `GET /api/exams` - Get all exams
-- `POST /api/exams` - Create a new exam
-- `GET /api/exams/:id` - Get exam details
-- `POST /api/exams/:id/submit` - Submit exam answers
-- `GET /api/results` - Get user's exam results
+### Authentication (`/api/v1/auth`)
+- `POST /signup` - User registration
+- `POST /signin` - User login
+- `POST /refresh` - Refresh access token
+- `POST /signout` - Sign out (revoke current session)
+- `POST /signout-all` - Sign out from all devices
+- `GET /profile` - Get current user profile
+- `GET /search` - Search users by email (examiner only)
+
+### Exams (`/api/v1/exams`)
+- `POST /` - Create a new exam (examiner only)
+- `GET /` - List all exams created by user (examiner only)
+- `GET /:id` - Get exam details (examiner only)
+- `PUT /:id` - Update exam (examiner only)
+- `DELETE /:id` - Delete exam (examiner only)
+- `GET /:id/results` - Get exam results (examiner only)
+- `GET /by-code` - Get exam by access code (participant)
+
+### Questions (`/api/v1/exams/:id/questions`)
+- `POST /` - Add question to exam (examiner only)
+- `PUT /:questionId` - Update question (examiner only)
+- `DELETE /:questionId` - Delete question (examiner only)
+
+### Participants (`/api/v1/exams/:id/participants`)
+- `POST /` - Add participant to exam (examiner only)
+- `GET /` - List all participants for an exam (examiner only)
+- `DELETE /:participantId` - Remove participant from exam (examiner only)
+- `GET /:participantId/result` - Get participant result details (examiner only)
+- `GET /my-exams` - Get all exams for current participant
+- `GET /my-exams/not-started` - Get not-started exams for participant
+- `GET /me` - Get participant exams (legacy endpoint)
+
+### Exam Attempts (`/api/v1/exams`)
+- `POST /start` - Start exam by access code
+- `GET /attempts/:attemptId/questions/next` - Get next question
+- `PUT /attempts/:attemptId/answers` - Submit answer
+- `POST /attempts/:attemptId/submit` - Submit exam
+- `GET /attempts/:attemptId/results` - Get attempt results
+- `GET /my-results` - Get user's exam results (with pagination)
+
+### Health
 - `GET /health` - Health check endpoint
+
+**Note:** All API endpoints are documented with Swagger and available at `/api-docs` when the backend is running.
 
 ## 🚧 Development Roadmap
 
+### Completed ✅
 - [x] Project setup and configuration
-- [ ] User authentication (register/login)
-- [ ] Exam creation interface
-- [ ] Exam taking interface with timer
-- [ ] Basic proctoring (focus detection)
-- [ ] Auto-grading system
-- [ ] Results dashboard
-- [ ] Exam analytics
+- [x] User authentication (register/login/logout)
+- [x] Session management with JWT tokens
+- [x] Exam creation interface
+- [x] Question management (add, update, delete)
+- [x] Participant management
+- [x] Exam taking interface with timer
+- [x] Auto-grading system
+- [x] Results dashboard for examiners and participants
+- [x] API documentation with Swagger
+- [x] Unit tests for repositories and services
+- [x] Error handling and validation
+- [x] Database design and implementation
+
+### In Progress 🚧
+- [ ] Advanced proctoring features
+- [ ] Exam analytics and reporting
+
+### Planned 📋
+- [ ] Advanced question types (essay, true/false, matching)
+- [ ] File upload support
+- [ ] Real-time notifications
+- [ ] Bulk participant import
+- [ ] Exam templates
+- [ ] Question banks
+- [ ] Export results to CSV/PDF
+- [ ] Email notifications
+- [ ] Multi-language support
 
 ## 📝 License
 

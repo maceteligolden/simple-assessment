@@ -1,4 +1,6 @@
-// Shared model classes
-
-export {};
-
+export * from './user.model'
+export * from './session.model'
+export * from './exam.model'
+export * from './question.model'
+export * from './exam-participant.model'
+export * from './exam-attempt.model'

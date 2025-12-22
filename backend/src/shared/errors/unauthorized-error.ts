@@ -1,5 +1,5 @@
-import { HTTP_STATUS } from '../constants';
-import { BaseError } from './base-error';
+import { HTTP_STATUS } from '../constants'
+import { BaseError } from './base-error'
 
 /**
  * Unauthorized Error
@@ -7,8 +7,7 @@ import { BaseError } from './base-error';
  */
 export class UnauthorizedError extends BaseError {
   constructor(message = 'Unauthorized', details?: unknown) {
-    super(message, HTTP_STATUS.UNAUTHORIZED, true, details);
-    this.name = 'UnauthorizedError';
+    super(message, HTTP_STATUS.UNAUTHORIZED, true, details)
+    this.name = 'UnauthorizedError'
   }
 }
-

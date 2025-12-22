@@ -1,5 +1,5 @@
-import { HTTP_STATUS } from '../constants';
-import { BaseError } from './base-error';
+import { HTTP_STATUS } from '../constants'
+import { BaseError } from './base-error'
 
 /**
  * Bad Request Error
@@ -7,8 +7,7 @@ import { BaseError } from './base-error';
  */
 export class BadRequestError extends BaseError {
   constructor(message = 'Bad Request', details?: unknown) {
-    super(message, HTTP_STATUS.BAD_REQUEST, true, details);
-    this.name = 'BadRequestError';
+    super(message, HTTP_STATUS.BAD_REQUEST, true, details)
+    this.name = 'BadRequestError'
   }
 }
-

@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import StoreProvider from '@/store/provider'
+import AuthProvider from '@/components/auth/AuthProvider'
+import { Toaster } from '@/components/ui/toaster'
+import { Navbar } from '@/components/layout'
 
 export const metadata: Metadata = {
   title: 'Simple Assessment Platform',
@@ -15,9 +18,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <StoreProvider>{children}</StoreProvider>
+        <StoreProvider>
+          <AuthProvider>
+            <Navbar />
+            {children}
+            <Toaster />
+          </AuthProvider>
+        </StoreProvider>
       </body>
     </html>
   )
 }
-

@@ -1,26 +1,15 @@
+export type UserRole = 'examiner' | 'participant'
+
+/**
+ * User interface (legacy - use UserProfileOutput from auth.interface.ts)
+ * @deprecated Use UserProfileOutput from auth.interface.ts
+ */
 export interface User {
   id: string
   email: string
   firstName: string
   lastName: string
+  role: UserRole
   createdAt: string
   updatedAt: string
 }
-
-export interface AuthResponse {
-  user: User
-  token: string
-}
-
-export interface LoginCredentials {
-  email: string
-  password: string
-}
-
-export interface RegisterData {
-  firstName: string
-  lastName: string
-  email: string
-  password: string
-}
-

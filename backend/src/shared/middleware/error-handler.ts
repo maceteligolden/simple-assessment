@@ -1,7 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
-import { BaseError } from '../errors';
-import { HTTP_STATUS, isDevelopment } from '../constants';
-import { logger } from '../util';
+import { Request, Response, NextFunction } from 'express'
+import { BaseError } from '../errors'
+import { HTTP_STATUS, isDevelopment } from '../constants'
+import { logger, ResponseUtil } from '../util'
 
 /**
  * Global Error Handler Middleware
@@ -15,7 +15,7 @@ export const errorHandler = (
 ): void => {
   // If response already sent, delegate to default Express error handler
   if (res.headersSent) {
-    return next(err);
+    return next(err)
   }
 
   // Log the error
@@ -24,57 +24,25 @@ export const errorHandler = (
     method: req.method,
     ip: req.ip,
     userAgent: req.get('user-agent'),
-  });
+  })
 
   // Handle BaseError instances
   if (err instanceof BaseError) {
-    const response: {
-      success: boolean;
-      error: {
-        message: string;
-        statusCode: number;
-        details?: unknown;
-      };
-    } = {
-      success: false,
-      error: {
-        message: err.message,
-        statusCode: err.statusCode,
-      },
-    };
-
-    // Include details in development or if explicitly provided
-    if (isDevelopment() && err.details) {
-      response.error.details = err.details;
-    }
-
-    res.status(err.statusCode).json(response);
-    return;
+    const details = isDevelopment() && err.details ? err.details : undefined
+    ResponseUtil.error(res, err.message, err.statusCode, details)
+    return
   }
 
   // Handle unknown errors
-  const response: {
-    success: boolean;
-    error: {
-      message: string;
-      statusCode: number;
-      stack?: string;
-    };
-  } = {
-    success: false,
-    error: {
-      message: err.message || 'Internal Server Error',
-      statusCode: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-    },
-  };
-
-  // Include stack trace in development
-  if (isDevelopment() && err.stack) {
-    response.error.stack = err.stack;
-  }
-
-  res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json(response);
-};
+  const details =
+    isDevelopment() && err.stack ? { stack: err.stack } : undefined
+  ResponseUtil.error(
+    res,
+    err.message || 'Internal Server Error',
+    HTTP_STATUS.INTERNAL_SERVER_ERROR,
+    details
+  )
+}
 
 /**
  * 404 Not Found Handler
@@ -88,14 +56,7 @@ export const notFoundHandler = (
   logger.warn(`Route not found: ${req.method} ${req.path}`, {
     ip: req.ip,
     userAgent: req.get('user-agent'),
-  });
+  })
 
-  res.status(HTTP_STATUS.NOT_FOUND).json({
-    success: false,
-    error: {
-      message: `Route ${req.method} ${req.path} not found`,
-      statusCode: HTTP_STATUS.NOT_FOUND,
-    },
-  });
-};
-
+  ResponseUtil.notFound(res, `Route ${req.method} ${req.path} not found`)
+}

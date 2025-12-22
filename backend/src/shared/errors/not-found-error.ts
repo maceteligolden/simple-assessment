@@ -1,5 +1,5 @@
-import { HTTP_STATUS } from '../constants';
-import { BaseError } from './base-error';
+import { HTTP_STATUS } from '../constants'
+import { BaseError } from './base-error'
 
 /**
  * Not Found Error
@@ -7,8 +7,7 @@ import { BaseError } from './base-error';
  */
 export class NotFoundError extends BaseError {
   constructor(message = 'Resource not found', details?: unknown) {
-    super(message, HTTP_STATUS.NOT_FOUND, true, details);
-    this.name = 'NotFoundError';
+    super(message, HTTP_STATUS.NOT_FOUND, true, details)
+    this.name = 'NotFoundError'
   }
 }
-

@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
-import { logger } from '../util';
+import { Request, Response, NextFunction } from 'express'
+import { logger } from '../util'
 
 /**
  * Request Logger Middleware
@@ -10,7 +10,7 @@ export const requestLogger = (
   res: Response,
   next: NextFunction
 ): void => {
-  const startTime = Date.now();
+  const startTime = Date.now()
 
   // Log request
   logger.http(`Incoming ${req.method} ${req.path}`, {
@@ -18,18 +18,17 @@ export const requestLogger = (
     userAgent: req.get('user-agent'),
     query: req.query,
     params: req.params,
-  });
+  })
 
   // Log response when finished
   res.on('finish', () => {
-    const duration = Date.now() - startTime;
+    const duration = Date.now() - startTime
     logger.http(`Outgoing ${req.method} ${req.path}`, {
       statusCode: res.statusCode,
       duration: `${duration}ms`,
       ip: req.ip,
-    });
-  });
+    })
+  })
 
-  next();
-};
-
+  next()
+}

@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/api'
 
 export default function LoginForm() {
   const router = useRouter()
-  const { login, isLoading, error } = useAuth()
+  const { signIn, isLoading, error } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
@@ -19,7 +19,7 @@ export default function LoginForm() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const result = await login(formData)
+    const result = await signIn(formData)
     if (result.success) {
       router.push('/dashboard')
     }
@@ -38,10 +38,7 @@ export default function LoginForm() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium mb-2"
-            >
+            <label htmlFor="email" className="block text-sm font-medium mb-2">
               Email
             </label>
             <Input
@@ -49,7 +46,7 @@ export default function LoginForm() {
               type="email"
               required
               value={formData.email}
-              onChange={(e) =>
+              onChange={e =>
                 setFormData({ ...formData, email: e.target.value })
               }
               placeholder="Enter your email"
@@ -70,7 +67,7 @@ export default function LoginForm() {
                 type={showPassword ? 'text' : 'password'}
                 required
                 value={formData.password}
-                onChange={(e) =>
+                onChange={e =>
                   setFormData({ ...formData, password: e.target.value })
                 }
                 placeholder="Enter your password"
@@ -92,18 +89,14 @@ export default function LoginForm() {
             </div>
           </div>
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading}
-          >
+          <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>
 
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link
               href="/signup"
               className="text-primary hover:underline font-medium"
@@ -116,4 +109,3 @@ export default function LoginForm() {
     </div>
   )
 }
-

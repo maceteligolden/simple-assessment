@@ -1,26 +1,11 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { useAuth } from '@/hooks/api'
-import { BYPASS_AUTH } from '@/constants/test.constants'
 
 export default function Home() {
-  const router = useRouter()
-  const { isAuthenticated } = useAuth()
-
-  useEffect(() => {
-    if (!BYPASS_AUTH && isAuthenticated) {
-      router.push('/dashboard')
-    }
-  }, [isAuthenticated, router])
-
-  if (!BYPASS_AUTH && isAuthenticated) {
-    return null
-  }
+  // Middleware handles redirect for authenticated users
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
@@ -33,9 +18,7 @@ export default function Home() {
         </p>
 
         <Card className="p-8 max-w-md mx-auto">
-          <h2 className="text-2xl font-semibold mb-6">
-            Get Started
-          </h2>
+          <h2 className="text-2xl font-semibold mb-6">Get Started</h2>
           <p className="text-gray-600 dark:text-gray-400 mb-8">
             Sign in to your account or create a new one to get started
           </p>
@@ -56,4 +39,3 @@ export default function Home() {
     </main>
   )
 }
-

@@ -1,3 +1,4 @@
-export { useToast, toast } from './use-toast'
-export { useDialog } from './use-dialog'
+export { useToast, toast } from './useToast'
+export { useDialog } from './useDialog'
+export { useBypassAuth } from './useBypassAuth'
 

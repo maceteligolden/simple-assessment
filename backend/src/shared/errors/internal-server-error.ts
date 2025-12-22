@@ -1,5 +1,5 @@
-import { HTTP_STATUS } from '../constants';
-import { BaseError } from './base-error';
+import { HTTP_STATUS } from '../constants'
+import { BaseError } from './base-error'
 
 /**
  * Internal Server Error
@@ -7,8 +7,7 @@ import { BaseError } from './base-error';
  */
 export class InternalServerError extends BaseError {
   constructor(message = 'Internal Server Error', details?: unknown) {
-    super(message, HTTP_STATUS.INTERNAL_SERVER_ERROR, false, details);
-    this.name = 'InternalServerError';
+    super(message, HTTP_STATUS.INTERNAL_SERVER_ERROR, false, details)
+    this.name = 'InternalServerError'
   }
 }
-

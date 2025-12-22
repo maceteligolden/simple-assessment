@@ -6,7 +6,8 @@ export const APP_CONFIG = {
 
 export const STORAGE_KEYS = {
   AUTH_TOKEN: 'auth_token',
-  USER: 'user',
+  REFRESH_TOKEN: 'refresh_token',
+  USER: 'auth_user',
   EXAM_ATTEMPT: 'exam_attempt',
 } as const
 
@@ -23,4 +24,11 @@ export const PROCTORING_CONFIG = {
   TAB_SWITCH_WARNING: true,
   COPY_PASTE_DISABLED: true,
 } as const
+
+export const USER_ROLES = {
+  EXAMINER: 'examiner',
+  PARTICIPANT: 'participant',
+} as const
+
+export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES]
 
