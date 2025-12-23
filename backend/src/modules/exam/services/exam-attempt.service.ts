@@ -6,6 +6,7 @@ import {
   IExamAttemptRepository,
 } from '../../../shared/repository'
 import { logger, paginateArray } from '../../../shared/util'
+import { EXAM_ATTEMPT_STATUS } from '../../../shared/constants'
 import {
   StartExamInput,
   StartExamOutput,
@@ -124,14 +125,14 @@ export class ExamAttemptService implements IExamAttemptService {
 
       if (existingAttempt) {
         // Check if attempt is abandoned
-        if (existingAttempt.status === 'abandoned') {
+        if (existingAttempt.status === EXAM_ATTEMPT_STATUS.ABANDONED) {
           throw new BadRequestError(
             'You cannot resume this exam. The exam session has been abandoned.'
           )
         }
 
         // Return existing attempt if still active
-        if (existingAttempt.status === 'in-progress') {
+        if (existingAttempt.status === EXAM_ATTEMPT_STATUS.IN_PROGRESS) {
           const questions = await this.questionRepository.findByExamId(
             exam._id.toString()
           )
@@ -148,7 +149,7 @@ export class ExamAttemptService implements IExamAttemptService {
           }
         }
 
-        if (existingAttempt.status === 'submitted') {
+        if (existingAttempt.status === EXAM_ATTEMPT_STATUS.SUBMITTED) {
           throw new BadRequestError('You have already completed this exam')
         }
       }
@@ -185,7 +186,7 @@ export class ExamAttemptService implements IExamAttemptService {
       const updatedAttempt = await this.attemptRepository.updateById(
         attempt._id.toString(),
         {
-          status: 'in-progress',
+          status: EXAM_ATTEMPT_STATUS.IN_PROGRESS,
           startedAt,
           timeRemaining: durationSeconds,
           lastActivityAt: startedAt,
@@ -474,7 +475,7 @@ export class ExamAttemptService implements IExamAttemptService {
       }
 
       // Check if already submitted
-      if (attempt.status === 'submitted') {
+      if (attempt.status === EXAM_ATTEMPT_STATUS.SUBMITTED) {
         throw new BadRequestError('Exam has already been submitted')
       }
 
@@ -517,7 +518,7 @@ export class ExamAttemptService implements IExamAttemptService {
       const updatedAttempt = await this.attemptRepository.updateById(
         attempt._id.toString(),
         {
-          status: 'submitted',
+          status: EXAM_ATTEMPT_STATUS.SUBMITTED,
           submittedAt,
           score: markingResult.score,
           maxScore: markingResult.maxScore,
@@ -576,7 +577,7 @@ export class ExamAttemptService implements IExamAttemptService {
       }
 
       // Check if exam is submitted
-      if (attempt.status !== 'submitted') {
+      if (attempt.status !== EXAM_ATTEMPT_STATUS.SUBMITTED) {
         throw new BadRequestError('Exam has not been submitted yet')
       }
 
@@ -711,7 +712,8 @@ export class ExamAttemptService implements IExamAttemptService {
 
       // Filter only submitted attempts
       const submittedAttempts = attempts.filter(
-        (attempt: IExamAttempt) => attempt.status === 'submitted'
+        (attempt: IExamAttempt) =>
+          attempt.status === EXAM_ATTEMPT_STATUS.SUBMITTED
       )
 
       logger.debug('Filtered submitted attempts', {

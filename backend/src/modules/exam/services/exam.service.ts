@@ -6,6 +6,7 @@ import {
 } from '../../../shared/repository'
 import { QuestionFactory } from '../factory/question.factory'
 import { logger, paginateArray } from '../../../shared/util'
+import { EXAM_ATTEMPT_STATUS } from '../../../shared/constants'
 import {
   CreateExamInput,
   CreateExamOutput,
@@ -444,7 +445,7 @@ export class ExamService implements IExamService {
       const { ExamAttempt } = await import('../../../shared/model')
       const attempts = await ExamAttempt.find({
         examId: exam._id,
-        status: 'submitted',
+        status: EXAM_ATTEMPT_STATUS.SUBMITTED,
       })
         .populate('userId', 'email')
         .sort({ submittedAt: -1 })

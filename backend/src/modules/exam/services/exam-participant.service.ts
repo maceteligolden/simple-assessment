@@ -13,6 +13,11 @@ import {
   createPaginationMetadata,
 } from '../../../shared/util'
 import {
+  EXAM_ATTEMPT_STATUS,
+  mapAttemptStatusToParticipantStatus,
+  type ExamAttemptStatus,
+} from '../../../shared/constants'
+import {
   AddParticipantInput,
   AddParticipantOutput,
   RemoveParticipantInput,
@@ -265,20 +270,14 @@ export class ExamParticipantService implements IExamParticipantService {
           let submittedAt: string | undefined
 
           if (attempt) {
-            // Map attempt.status to attemptStatus
-            // Backend uses 'submitted' but frontend expects 'completed'
-            if (attempt.status === 'submitted') {
-              attemptStatus = 'completed'
+            // Map attempt.status to attemptStatus using the mapping function
+            attemptStatus = mapAttemptStatusToParticipantStatus(
+              attempt.status as ExamAttemptStatus
+            )
+            if (attempt.status === EXAM_ATTEMPT_STATUS.SUBMITTED) {
               score = attempt.score
               maxScore = attempt.maxScore
               percentage = attempt.percentage
-            } else if (attempt.status === 'in-progress') {
-              attemptStatus = 'in-progress'
-            } else if (attempt.status === 'abandoned') {
-              attemptStatus = 'abandoned'
-            } else {
-              // Default to 'not_started' for any other status
-              attemptStatus = 'not_started'
             }
 
             if (attempt.startedAt) {
@@ -375,7 +374,7 @@ export class ExamParticipantService implements IExamParticipantService {
         },
       }
 
-      if (attempt && attempt.status === 'submitted') {
+      if (attempt && attempt.status === EXAM_ATTEMPT_STATUS.SUBMITTED) {
         // Get questions for the exam to build answer details
         const questions = await this.questionRepository.findByExamId(
           exam._id.toString()

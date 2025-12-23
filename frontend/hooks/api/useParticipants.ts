@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useApi } from './useApi'
-import { API_ENDPOINTS } from '@/constants'
+import { API_ENDPOINTS, EXAM_ATTEMPT_STATUS } from '@/constants'
 import { ExamParticipant } from '@/interfaces'
 
 interface ListParticipantsOutput {
@@ -47,8 +47,14 @@ export function useParticipants(examId: string) {
           examId: examId,
           email: p.email,
           accessCode: p.accessCode,
-          hasStarted: p.isUsed || p.attemptStatus === 'in-progress' || false,
-          hasCompleted: p.attemptStatus === 'completed' || p.attemptStatus === 'submitted' || false,
+          hasStarted:
+            p.isUsed ||
+            p.attemptStatus === EXAM_ATTEMPT_STATUS.IN_PROGRESS ||
+            false,
+          hasCompleted:
+            p.attemptStatus === EXAM_ATTEMPT_STATUS.COMPLETED ||
+            p.attemptStatus === EXAM_ATTEMPT_STATUS.SUBMITTED ||
+            false,
           score: p.score,
           maxScore: p.maxScore,
           startedAt: p.startedAt,

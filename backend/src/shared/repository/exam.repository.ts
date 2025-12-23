@@ -2,6 +2,7 @@ import { injectable } from 'tsyringe'
 import { IExam, Exam } from '../model/exam.model'
 import { logger } from '../util/logger'
 import { Types } from 'mongoose'
+import { EXAM_ATTEMPT_STATUS } from '../constants'
 
 /**
  * Exam Repository Interface
@@ -275,7 +276,12 @@ export class ExamRepository implements IExamRepository {
       const { ExamAttempt } = await import('../model/exam-attempt.model')
       const count = await ExamAttempt.countDocuments({
         examId: new Types.ObjectId(examId),
-        status: { $in: ['in-progress', 'submitted'] },
+        status: {
+          $in: [
+            EXAM_ATTEMPT_STATUS.IN_PROGRESS,
+            EXAM_ATTEMPT_STATUS.SUBMITTED,
+          ],
+        },
       })
       return count > 0
     } catch (error) {

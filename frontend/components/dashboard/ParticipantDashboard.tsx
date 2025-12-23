@@ -8,6 +8,7 @@ import {
   ParticipantExam,
 } from '@/components/ui/data-table/column-definitions'
 import { BookOpen } from 'lucide-react'
+import { EXAM_ATTEMPT_STATUS } from '@/constants'
 
 export function ParticipantDashboard() {
   // Participant search and filter state for all participant exams
@@ -67,10 +68,22 @@ export function ParticipantDashboard() {
             type: 'select',
             options: [
               { value: 'all', label: 'All Status' },
-              { value: 'not_started', label: 'Not Started' },
-              { value: 'in-progress', label: 'In Progress' },
-              { value: 'completed', label: 'Completed' },
-              { value: 'abandoned', label: 'Abandoned' },
+              {
+                value: EXAM_ATTEMPT_STATUS.NOT_STARTED,
+                label: 'Not Started',
+              },
+              {
+                value: EXAM_ATTEMPT_STATUS.IN_PROGRESS,
+                label: 'In Progress',
+              },
+              {
+                value: EXAM_ATTEMPT_STATUS.COMPLETED,
+                label: 'Completed',
+              },
+              {
+                value: EXAM_ATTEMPT_STATUS.ABANDONED,
+                label: 'Abandoned',
+              },
             ],
             defaultValue: 'all',
           },

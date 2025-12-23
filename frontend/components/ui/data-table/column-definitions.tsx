@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { ColumnDef } from './types'
 import { Exam } from '@/interfaces'
 import { FileText, Users, Clock, Calendar, Eye, Edit, Play } from 'lucide-react'
+import { EXAM_ATTEMPT_STATUS } from '@/constants'
 
 // Extended Exam type with additional fields from API
 export interface ExamWithCounts extends Exam {
@@ -22,12 +23,7 @@ export interface ParticipantExam {
   questionCount: number
   accessCode: string
   addedAt: string
-  attemptStatus?:
-    | 'not_started'
-    | 'in-progress'
-    | 'completed'
-    | 'submitted'
-    | 'abandoned'
+  attemptStatus?: typeof EXAM_ATTEMPT_STATUS[keyof typeof EXAM_ATTEMPT_STATUS]
   attemptId?: string
   score?: number
   maxScore?: number
@@ -248,7 +244,7 @@ export const getParticipantExamColumns = (): ColumnDef<ParticipantExam>[] => [
           ? 'not_started'
           : row.attemptStatus
 
-      if (status === 'not_started') {
+      if (status === EXAM_ATTEMPT_STATUS.NOT_STARTED) {
         return (
           <Link href={`/dashboard/exams/start?code=${row.accessCode}`}>
             <Button size="sm">Start Exam</Button>
@@ -256,7 +252,10 @@ export const getParticipantExamColumns = (): ColumnDef<ParticipantExam>[] => [
         )
       }
 
-      if (status === 'completed' || status === 'submitted') {
+      if (
+        status === EXAM_ATTEMPT_STATUS.COMPLETED ||
+        status === EXAM_ATTEMPT_STATUS.SUBMITTED
+      ) {
         return row.attemptId ? (
           <Link href={`/dashboard/exams/attempts/${row.attemptId}/results`}>
             <Button variant="outline" size="sm">
@@ -269,7 +268,7 @@ export const getParticipantExamColumns = (): ColumnDef<ParticipantExam>[] => [
         )
       }
 
-      if (status === 'in-progress') {
+      if (status === EXAM_ATTEMPT_STATUS.IN_PROGRESS) {
         return row.attemptId ? (
           <Link href={`/dashboard/exams/attempts/${row.attemptId}/take`}>
             <Button size="sm">
