@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ExamNavbar } from '@/components/exam/ExamNavbar'
 import { QuestionRenderer } from '@/components/exam/QuestionRenderer'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CheckCircle2, Loader2 } from 'lucide-react'
 import { useGetNextQuestion, useSubmitAnswer, useSubmitExam } from '@/hooks/api'
 import { useToast } from '@/hooks/ui/useToast'
 import { Question } from '@/interfaces'
@@ -15,7 +15,7 @@ export default function TakeExamPage() {
   const router = useRouter()
   const params = useParams()
   const attemptId = params.attemptId as string
-  const { success: toastSuccess, error: toastError } = useToast()
+  const { error: toastError } = useToast()
 
   const { getNextQuestion, isLoading: isLoadingQuestion } = useGetNextQuestion()
   const { submitAnswer, isLoading: isSubmittingAnswer } = useSubmitAnswer()
@@ -32,6 +32,8 @@ export default function TakeExamPage() {
   const [timeRemaining, setTimeRemaining] = useState<number>(0)
   const [answer, setAnswer] = useState<string | string[] | undefined>(undefined)
   const [hasAnswered, setHasAnswered] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Fetch first question on mount
   useEffect(() => {
@@ -48,10 +50,7 @@ export default function TakeExamPage() {
       const backendQuestion = result.data.question
       const mappedQuestion: Question = {
         id: backendQuestion.id,
-        type:
-          backendQuestion.type === 'multi-choice'
-            ? 'multiple-choice'
-            : (backendQuestion.type as any),
+        type: 'multiple-choice',
         question: backendQuestion.question,
         options: backendQuestion.options || [],
         points: backendQuestion.points,
@@ -103,8 +102,13 @@ export default function TakeExamPage() {
   }, [timeRemaining])
 
   const handleAutoSubmit = async () => {
+    // Clear any pending autosave
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current)
+    }
+
     if (answer && currentQuestion && !hasAnswered) {
-      await handleSubmitAnswer()
+      await handleAutoSave(answer)
     }
     // Auto-submit exam when time runs out
     const result = await submitExam(attemptId)
@@ -118,15 +122,32 @@ export default function TakeExamPage() {
   const handleAnswerChange = (newAnswer: string | string[]) => {
     setAnswer(newAnswer)
     setHasAnswered(false)
-  }
 
-  const handleSubmitAnswer = async (): Promise<boolean> => {
-    if (!currentQuestion || !answer) {
-      toastError('Please select an answer', 'Answer Required')
-      return false
+    // Clear any existing autosave timeout
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current)
     }
 
-    const result = await submitAnswer(attemptId, currentQuestion.id, answer)
+    // Debounce autosave - wait 500ms after user stops changing answer
+    autosaveTimeoutRef.current = setTimeout(() => {
+      if (newAnswer && currentQuestion) {
+        handleAutoSave(newAnswer)
+      }
+    }, 500)
+  }
+
+  const handleAutoSave = async (answerToSave: string | string[]) => {
+    if (!currentQuestion || !answerToSave) {
+      return
+    }
+
+    setIsSaving(true)
+    const result = await submitAnswer(
+      attemptId,
+      currentQuestion.id,
+      answerToSave
+    )
+
     if (result.success && result.data) {
       setHasAnswered(true)
       setTimeRemaining(result.data.timeRemaining)
@@ -142,17 +163,33 @@ export default function TakeExamPage() {
           remaining: result.data.progress.total - result.data.progress.answered,
         })
       }
-      toastSuccess('Answer saved', 'Success')
-      return true
+      // Don't show toast for autosave to avoid interrupting user
     } else {
+      // Only show error if save fails
       toastError(result.error || 'Failed to save answer', 'Error')
-      return false
     }
+    setIsSaving(false)
   }
 
+  // Cleanup autosave timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const handleNext = async () => {
-    if (!hasAnswered && answer) {
-      await handleSubmitAnswer()
+    // If answer hasn't been saved yet, save it now before moving to next question
+    if (!hasAnswered && answer && currentQuestion) {
+      // Clear any pending autosave
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current)
+      }
+      await handleAutoSave(answer)
+      // Wait a bit for state to update
+      await new Promise(resolve => setTimeout(resolve, 100))
     }
     await fetchQuestion()
   }
@@ -167,12 +204,14 @@ export default function TakeExamPage() {
   }
 
   const handleEndExam = async () => {
+    // Clear any pending autosave
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current)
+    }
+
     // Save current answer if not saved yet
     if (!hasAnswered && answer && currentQuestion) {
-      const saveResult = await handleSubmitAnswer()
-      if (!saveResult) {
-        return // Failed to save, don't proceed
-      }
+      await handleAutoSave(answer)
       // Wait a bit for state to update
       await new Promise(resolve => setTimeout(resolve, 100))
     }
@@ -250,19 +289,30 @@ export default function TakeExamPage() {
                   onAnswerChange={handleAnswerChange}
                   questionNumber={progress.currentIndex + 1}
                 />
-                <div className="mt-6 flex justify-end">
-                  <Button
-                    onClick={handleSubmitAnswer}
-                    disabled={!answer || hasAnswered || isSubmittingAnswer}
-                    variant="outline"
-                  >
-                    {isSubmittingAnswer
-                      ? 'Saving...'
-                      : hasAnswered
-                        ? 'Saved'
-                        : 'Save Answer'}
-                  </Button>
-                </div>
+                {/* Autosave status indicator */}
+                {answer && (
+                  <div className="mt-4 flex justify-end items-center gap-2 text-sm">
+                    {isSaving || isSubmittingAnswer ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Saving...
+                        </span>
+                      </>
+                    ) : hasAnswered ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        <span className="text-green-600 dark:text-green-400">
+                          Saved
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-gray-500 dark:text-gray-500">
+                        Answer will be saved automatically
+                      </span>
+                    )}
+                  </div>
+                )}
               </>
             ) : null}
           </CardContent>
@@ -290,7 +340,7 @@ export default function TakeExamPage() {
           ) : (
             <Button
               onClick={handleNext}
-              disabled={isLoading || !hasAnswered}
+              disabled={isLoading || !answer}
               size="lg"
             >
               Next
