@@ -48,7 +48,7 @@ export function useParticipants(examId: string) {
           email: p.email,
           accessCode: p.accessCode,
           hasStarted: p.isUsed || p.attemptStatus === 'in-progress' || false,
-          hasCompleted: p.attemptStatus === 'submitted' || false,
+          hasCompleted: p.attemptStatus === 'completed' || p.attemptStatus === 'submitted' || false,
           score: p.score,
           maxScore: p.maxScore,
           startedAt: p.startedAt,

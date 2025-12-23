@@ -265,16 +265,22 @@ export class ExamParticipantService implements IExamParticipantService {
           let submittedAt: string | undefined
 
           if (attempt) {
-            attemptStatus = attempt.status as
-              | 'not_started'
-              | 'in-progress'
-              | 'completed'
-              | 'abandoned'
+            // Map attempt.status to attemptStatus
+            // Backend uses 'submitted' but frontend expects 'completed'
             if (attempt.status === 'submitted') {
+              attemptStatus = 'completed'
               score = attempt.score
               maxScore = attempt.maxScore
               percentage = attempt.percentage
+            } else if (attempt.status === 'in-progress') {
+              attemptStatus = 'in-progress'
+            } else if (attempt.status === 'abandoned') {
+              attemptStatus = 'abandoned'
+            } else {
+              // Default to 'not_started' for any other status
+              attemptStatus = 'not_started'
             }
+
             if (attempt.startedAt) {
               startedAt = attempt.startedAt.toISOString()
             }
@@ -520,16 +526,22 @@ export class ExamParticipantService implements IExamParticipantService {
 
           if (attempt) {
             attemptId = attempt._id.toString()
-            attemptStatus = attempt.status as
-              | 'not_started'
-              | 'in-progress'
-              | 'completed'
-              | 'abandoned'
+            // Map attempt.status to attemptStatus
+            // Backend uses 'submitted' but frontend expects 'completed'
             if (attempt.status === 'submitted') {
+              attemptStatus = 'completed'
               score = attempt.score
               maxScore = attempt.maxScore
               percentage = attempt.percentage
+            } else if (attempt.status === 'in-progress') {
+              attemptStatus = 'in-progress'
+            } else if (attempt.status === 'abandoned') {
+              attemptStatus = 'abandoned'
+            } else {
+              // Default to 'not_started' for any other status
+              attemptStatus = 'not_started'
             }
+
             if (attempt.startedAt) {
               startedAt = attempt.startedAt.toISOString()
             }
