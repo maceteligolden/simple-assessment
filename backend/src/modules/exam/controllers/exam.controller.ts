@@ -58,6 +58,7 @@ export class ExamController implements IExamController {
         endDate: req.body.endDate,
         randomizeQuestions: req.body.randomizeQuestions,
         showResultsImmediately: req.body.showResultsImmediately,
+        passPercentage: req.body.passPercentage,
       }
 
       const result = await this.examService.createExam(input, req.user.userId)

@@ -38,6 +38,7 @@ export interface Exam {
   startDate?: string // ISO date string
   endDate?: string // ISO date string
   randomizeQuestions: boolean
+  passPercentage: number // Pass mark percentage (1-100)
   createdAt: string
   updatedAt: string
 }
@@ -51,6 +52,7 @@ export interface CreateExamDto {
   startDate?: string
   endDate?: string
   randomizeQuestions: boolean
+  passPercentage: number
   questions: Omit<Question, 'id' | 'order'>[]
 }
 export interface ExamAttempt {

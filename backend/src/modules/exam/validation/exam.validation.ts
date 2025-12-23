@@ -39,6 +39,11 @@ export const createExamSchema = z.object({
       .optional(),
     randomizeQuestions: z.boolean().optional().default(false),
     showResultsImmediately: z.boolean().optional().default(true),
+    passPercentage: z
+      .number('Pass percentage is required')
+      .int('Pass percentage must be an integer')
+      .min(1, 'Pass percentage must be at least 1%')
+      .max(100, 'Pass percentage must not exceed 100%'),
   }),
 })
 
@@ -67,6 +72,12 @@ export const updateExamSchema = z.object({
     endDate: z.string().optional(),
     randomizeQuestions: z.boolean().optional(),
     showResultsImmediately: z.boolean().optional(),
+    passPercentage: z
+      .number()
+      .int('Pass percentage must be an integer')
+      .min(1, 'Pass percentage must be at least 1%')
+      .max(100, 'Pass percentage must not exceed 100%')
+      .optional(),
   }),
 })
 

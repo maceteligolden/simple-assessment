@@ -28,6 +28,7 @@ export default function EditExamPage() {
   // Fetch exam details
   const {
     exam,
+    participants,
     isLoading: isLoadingExam,
     error: examError,
     refetch: refetchExam,
@@ -55,6 +56,7 @@ export default function EditExamPage() {
         startDate: exam.startDate,
         endDate: exam.endDate,
         randomizeQuestions: exam.randomizeQuestions,
+        passPercentage: exam.passPercentage || 50,
         questions: exam.questions.map(q => {
           // Map question from Exam format to CreateExamDto format
           const questionText =
@@ -138,6 +140,7 @@ export default function EditExamPage() {
         startDate: exam.startDate,
         endDate: exam.endDate,
         randomizeQuestions: exam.randomizeQuestions,
+        passPercentage: exam.passPercentage || 50,
         questions: exam.questions.map(q => {
           const questionText =
             typeof q.question === 'string'
@@ -232,6 +235,9 @@ export default function EditExamPage() {
               onSubmit={handleFormSubmit}
               isLoading={isLoading}
               initialData={examData}
+              disablePassPercentage={
+                participants?.some(p => p.hasStarted) ?? false
+              }
             />
           </div>
         )}

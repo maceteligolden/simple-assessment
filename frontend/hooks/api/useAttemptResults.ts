@@ -18,6 +18,8 @@ interface AttemptResultsResponse {
   score: number
   maxScore: number
   percentage: number
+  passed: boolean
+  passPercentage: number
   submittedAt: string
   answers: AnswerDetail[]
 }

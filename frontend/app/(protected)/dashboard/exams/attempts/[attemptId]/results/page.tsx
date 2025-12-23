@@ -71,7 +71,8 @@ export default function AttemptResultsPage() {
   }
 
   const percentage = results.percentage
-  const passed = percentage >= 70 // Assuming 70% is passing
+  const passPercentage = results.passPercentage ?? 70
+  const passed = results.passed ?? percentage >= passPercentage
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -123,11 +124,26 @@ export default function AttemptResultsPage() {
             </div>
 
             <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                <Clock className="h-4 w-4" />
-                <span>
-                  Submitted on {new Date(results.submittedAt).toLocaleString()}
-                </span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <Clock className="h-4 w-4" />
+                  <span>
+                    Submitted on {new Date(results.submittedAt).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <span>Pass Mark: {passPercentage}%</span>
+                  <span className="text-gray-400">•</span>
+                  <span
+                    className={
+                      passed
+                        ? 'text-green-600 dark:text-green-400 font-medium'
+                        : 'text-red-600 dark:text-red-400 font-medium'
+                    }
+                  >
+                    {percentage.toFixed(1)}% {passed ? '≥' : '<'} {passPercentage}%
+                  </span>
+                </div>
               </div>
             </div>
           </CardContent>

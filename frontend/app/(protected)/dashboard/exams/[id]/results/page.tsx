@@ -68,6 +68,7 @@ const mockExamResult: ExamResult = {
     isPublic: true,
     availableAnytime: true,
     randomizeQuestions: false,
+    passPercentage: 70,
     createdAt: '2024-01-15T10:00:00Z',
     updatedAt: '2024-01-15T10:00:00Z',
   },
@@ -163,7 +164,7 @@ export default function ExamResultsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="text-center p-6 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                 <div className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">
                   {percentage}%
@@ -186,6 +187,14 @@ export default function ExamResultsPage() {
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Time Taken
+                </div>
+              </div>
+              <div className="text-center p-6 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                <div className="text-4xl font-bold text-amber-600 dark:text-amber-400 mb-2">
+                  {exam.passPercentage}%
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Pass Mark
                 </div>
               </div>
             </div>

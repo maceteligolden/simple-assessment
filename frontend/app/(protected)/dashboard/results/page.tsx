@@ -40,7 +40,7 @@ export default function ResultsPage() {
   // Calculate statistics from current page results
   // Note: For accurate stats, we'd need all results, but for now we'll show page-level stats
   const totalExams = pagination?.total || results.length
-  const passedExams = results.filter(r => r.percentage >= 70).length
+  const passedExams = results.filter(r => r.passed).length
   const averageScore =
     results.length > 0
       ? results.reduce((sum, r) => sum + r.percentage, 0) / results.length
@@ -143,7 +143,7 @@ export default function ResultsPage() {
           <>
             <div className="space-y-4">
               {results.map(result => {
-                const passed = result.percentage >= 70
+                const passed = result.passed ?? false
                 return (
                   <Card key={result.attemptId}>
                     <CardContent className="p-6">

@@ -87,6 +87,8 @@ export interface GetAttemptResultsOutput {
   score: number
   maxScore: number
   percentage: number
+  passed: boolean
+  passPercentage: number
   submittedAt: string
   answers: Array<{
     questionId: string
@@ -110,6 +112,8 @@ export interface GetMyResultsOutput {
     score: number
     maxScore: number
     percentage: number
+    passed: boolean
+    passPercentage: number
     submittedAt: string
     status: string
   }>

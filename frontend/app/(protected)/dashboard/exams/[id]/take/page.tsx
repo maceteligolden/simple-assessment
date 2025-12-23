@@ -54,6 +54,7 @@ const mockExam: Exam = {
   isPublic: true,
   availableAnytime: true,
   randomizeQuestions: false,
+  passPercentage: 70,
   createdAt: '2024-01-15T10:00:00Z',
   updatedAt: '2024-01-15T10:00:00Z',
 }

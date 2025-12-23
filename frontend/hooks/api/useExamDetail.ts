@@ -43,6 +43,7 @@ export function useExamDetail(examId: string) {
         startDate: data.startDate,
         endDate: data.endDate,
         randomizeQuestions: data.randomizeQuestions,
+        passPercentage: data.passPercentage || 50,
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
       }

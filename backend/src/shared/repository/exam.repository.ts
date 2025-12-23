@@ -17,6 +17,7 @@ export interface IExamRepository {
     endDate?: Date
     randomizeQuestions: boolean
     showResultsImmediately: boolean
+    passPercentage: number
   }): Promise<IExam>
   findById(id: string): Promise<IExam | null>
   findByCreatorId(
@@ -49,6 +50,7 @@ export class ExamRepository implements IExamRepository {
     endDate?: Date
     randomizeQuestions: boolean
     showResultsImmediately: boolean
+    passPercentage: number
   }): Promise<IExam> {
     try {
       logger.info('[Exam Repository] Creating exam', {

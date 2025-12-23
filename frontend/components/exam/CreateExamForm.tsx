@@ -18,6 +18,7 @@ interface CreateExamFormProps {
   onSubmit: (data: CreateExamDto) => void
   isLoading?: boolean
   initialData?: CreateExamDto
+  disablePassPercentage?: boolean
 }
 
 interface Question {
@@ -32,6 +33,7 @@ export default function CreateExamForm({
   onSubmit,
   isLoading,
   initialData,
+  disablePassPercentage = false,
 }: CreateExamFormProps) {
   const [formData, setFormData] = useState({
     title: initialData?.title || '',
@@ -41,6 +43,7 @@ export default function CreateExamForm({
     startDate: initialData?.startDate || '',
     endDate: initialData?.endDate || '',
     randomizeQuestions: initialData?.randomizeQuestions || false,
+    passPercentage: initialData?.passPercentage?.toString() || '50',
   })
 
   const [questions, setQuestions] = useState<Question[]>(
@@ -68,6 +71,7 @@ export default function CreateExamForm({
         startDate: initialData.startDate || '',
         endDate: initialData.endDate || '',
         randomizeQuestions: initialData.randomizeQuestions || false,
+        passPercentage: initialData.passPercentage?.toString() || '50',
       })
       setQuestions(
         initialData.questions.map((q, index) => ({
@@ -221,6 +225,14 @@ export default function CreateExamForm({
       newErrors.timeLimit = 'Valid duration is required'
     }
 
+    if (
+      !formData.passPercentage ||
+      parseInt(formData.passPercentage) < 1 ||
+      parseInt(formData.passPercentage) > 100
+    ) {
+      newErrors.passPercentage = 'Pass percentage must be between 1 and 100'
+    }
+
     if (!formData.availableAnytime) {
       if (!formData.startDate) {
         newErrors.startDate = 'Start date is required'
@@ -293,6 +305,7 @@ export default function CreateExamForm({
         ? undefined
         : formData.endDate || undefined,
       randomizeQuestions: formData.randomizeQuestions,
+      passPercentage: parseInt(formData.passPercentage, 10),
       questions: questions.map(q => ({
         type: 'multiple-choice' as const, // Only multiple-choice for now
         question: q.question.trim(),
@@ -370,6 +383,42 @@ export default function CreateExamForm({
             />
             {errors.timeLimit && (
               <p className="text-sm text-red-500 mt-1">{errors.timeLimit}</p>
+            )}
+          </div>
+
+          <div>
+            <label
+              htmlFor="passPercentage"
+              className="block text-sm font-medium mb-2"
+            >
+              Pass Percentage (%) <span className="text-red-500">*</span>
+            </label>
+            <Input
+              id="passPercentage"
+              type="number"
+              min="1"
+              max="100"
+              value={formData.passPercentage}
+              onChange={e =>
+                setFormData({ ...formData, passPercentage: e.target.value })
+              }
+              placeholder="e.g., 70"
+              className={errors.passPercentage ? 'border-red-500' : ''}
+              disabled={disablePassPercentage}
+            />
+            {errors.passPercentage && (
+              <p className="text-sm text-red-500 mt-1">
+                {errors.passPercentage}
+              </p>
+            )}
+            {disablePassPercentage ? (
+              <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+              Pass percentage cannot be edited. Participants have already started this exam.
+            </p>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Minimum percentage required to pass the exam (1-100%)
+              </p>
             )}
           </div>
         </CardContent>

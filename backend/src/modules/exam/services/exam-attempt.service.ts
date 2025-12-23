@@ -664,12 +664,17 @@ export class ExamAttemptService implements IExamAttemptService {
         })
       )
 
+      const percentage = attempt.percentage || 0
+      const passed = percentage >= exam.passPercentage
+
       return {
         attemptId: attempt._id.toString(),
         examId: exam._id.toString(),
         score: attempt.score || 0,
         maxScore: attempt.maxScore || 0,
-        percentage: attempt.percentage || 0,
+        percentage,
+        passed,
+        passPercentage: exam.passPercentage,
         submittedAt: attempt.submittedAt!.toISOString(),
         answers: answerDetails,
       }
@@ -722,13 +727,19 @@ export class ExamAttemptService implements IExamAttemptService {
             this.getExamIdString(attempt)
           )
 
+          const percentage = attempt.percentage || 0
+          const passPercentage = exam?.passPercentage || 0
+          const passed = percentage >= passPercentage
+
           return {
             attemptId: attempt._id.toString(),
             examId: attempt.examId.toString(),
             examTitle: exam?.title || 'Unknown Exam',
             score: attempt.score || 0,
             maxScore: attempt.maxScore || 0,
-            percentage: attempt.percentage || 0,
+            percentage,
+            passed,
+            passPercentage,
             submittedAt: attempt.submittedAt!.toISOString(),
             status: attempt.status,
           }

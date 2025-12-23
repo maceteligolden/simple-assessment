@@ -17,6 +17,7 @@ export interface CreateExamInput {
   endDate?: string
   randomizeQuestions: boolean
   showResultsImmediately: boolean
+  passPercentage: number
 }
 
 export interface CreateExamOutput {
@@ -26,6 +27,7 @@ export interface CreateExamOutput {
   duration: number
   availableAnytime: boolean
   randomizeQuestions: boolean
+  passPercentage: number
   createdAt: string
 }
 
@@ -71,6 +73,7 @@ export interface GetExamOutput {
   endDate?: string
   randomizeQuestions: boolean
   showResultsImmediately: boolean
+  passPercentage: number
   questions: Array<{
     id: string
     type: string
@@ -101,6 +104,7 @@ export interface UpdateExamInput {
   endDate?: string
   randomizeQuestions?: boolean
   showResultsImmediately?: boolean
+  passPercentage?: number
 }
 
 export interface UpdateExamOutput {
@@ -131,6 +135,8 @@ export type GetExamResultsOutput = Array<{
   score: number
   maxScore: number
   percentage: number
+  passed: boolean
+  passPercentage: number
   submittedAt: string
   status: string
 }>
@@ -149,6 +155,7 @@ export interface GetExamByCodeOutput {
   startDate?: string
   endDate?: string
   randomizeQuestions: boolean
+  passPercentage: number
   questions: Array<{
     id: string
     type: string

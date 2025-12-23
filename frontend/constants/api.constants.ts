@@ -22,6 +22,7 @@ export const API_ENDPOINTS = {
     START: '/api/v1/exams/start',
     SUBMIT: (attemptId: string) => `/api/v1/exams/attempts/${attemptId}/submit`,
     RESULTS: (attemptId: string) => `/api/v1/exams/attempts/${attemptId}/results`,
+    EXAM_RESULTS: (examId: string) => `/api/v1/exams/${examId}/results`,
   },
   // Exam Attempt endpoints
   ATTEMPTS: {

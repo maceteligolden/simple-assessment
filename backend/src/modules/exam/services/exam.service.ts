@@ -135,6 +135,7 @@ export class ExamService implements IExamService {
         duration: exam.duration,
         availableAnytime: exam.availableAnytime,
         randomizeQuestions: exam.randomizeQuestions,
+        passPercentage: exam.passPercentage,
         createdAt: exam.createdAt.toISOString(),
       }
 
@@ -272,6 +273,7 @@ export class ExamService implements IExamService {
         endDate: exam.endDate?.toISOString(),
         randomizeQuestions: exam.randomizeQuestions,
         showResultsImmediately: exam.showResultsImmediately,
+        passPercentage: exam.passPercentage,
         questions: questions.map((q: IQuestion) => {
           // Use factory to render question (excludes sensitive data)
           const questionHandler = QuestionFactory.create(q.type)
@@ -316,15 +318,10 @@ export class ExamService implements IExamService {
         )
       }
 
-      // Check if exam has active attempts (cannot edit if participants have started)
+      // Check if participants have started (for passPercentage edit restriction)
       const hasAttempts = await this.examRepository.hasActiveAttempts(
         exam._id.toString()
       )
-      if (hasAttempts) {
-        throw new BadRequestError(
-          'Cannot edit exam that has active attempts. Participants have already started this exam.'
-        )
-      }
 
       // Prepare update data
       const updateData: Partial<IExam> = {}
@@ -342,6 +339,17 @@ export class ExamService implements IExamService {
         updateData.randomizeQuestions = data.randomizeQuestions
       if (data.showResultsImmediately !== undefined)
         updateData.showResultsImmediately = data.showResultsImmediately
+      
+      // Check if passPercentage is being changed
+      if (data.passPercentage !== undefined) {
+        // If participants have started, prevent passPercentage edit
+        if (hasAttempts) {
+          throw new BadRequestError(
+            'Cannot edit pass percentage. Participants have already started this exam.'
+          )
+        }
+        updateData.passPercentage = data.passPercentage
+      }
 
       const updatedExam = await this.examRepository.updateById(
         exam._id.toString(),
@@ -441,15 +449,21 @@ export class ExamService implements IExamService {
         .populate('userId', 'email')
         .sort({ submittedAt: -1 })
 
-      const results = attempts.map((attempt: IExamAttempt) => ({
-        attemptId: attempt._id.toString(),
-        participantEmail: (attempt.userId as any).email,
-        score: attempt.score || 0,
-        maxScore: attempt.maxScore || 0,
-        percentage: attempt.percentage || 0,
-        submittedAt: attempt.submittedAt!.toISOString(),
-        status: attempt.status,
-      }))
+      const results = attempts.map((attempt: IExamAttempt) => {
+        const percentage = attempt.percentage || 0
+        const passed = percentage >= exam.passPercentage
+        return {
+          attemptId: attempt._id.toString(),
+          participantEmail: (attempt.userId as any).email,
+          score: attempt.score || 0,
+          maxScore: attempt.maxScore || 0,
+          percentage,
+          passed,
+          passPercentage: exam.passPercentage,
+          submittedAt: attempt.submittedAt!.toISOString(),
+          status: attempt.status,
+        }
+      })
 
       return results
     } catch (error) {
@@ -514,6 +528,7 @@ export class ExamService implements IExamService {
         startDate: exam.startDate?.toISOString(),
         endDate: exam.endDate?.toISOString(),
         randomizeQuestions: exam.randomizeQuestions,
+        passPercentage: exam.passPercentage,
         questions: renderedQuestions,
         totalQuestions: questions.length,
         participantId: participant._id.toString(),

@@ -12,6 +12,7 @@ export interface IExam extends Document {
   endDate?: Date
   randomizeQuestions: boolean
   showResultsImmediately: boolean
+  passPercentage: number // Pass mark percentage (1-100)
   isActive: boolean
   isDeleted: boolean
   questions: Types.ObjectId[] // References to questions
@@ -77,6 +78,12 @@ const examSchema = new Schema<IExam>(
     showResultsImmediately: {
       type: Boolean,
       default: true,
+    },
+    passPercentage: {
+      type: Number,
+      required: [true, 'Pass percentage is required'],
+      min: [1, 'Pass percentage must be at least 1%'],
+      max: [100, 'Pass percentage must not exceed 100%'],
     },
     isActive: {
       type: Boolean,

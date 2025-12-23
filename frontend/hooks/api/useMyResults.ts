@@ -10,6 +10,8 @@ interface MyResult {
   score: number
   maxScore: number
   percentage: number
+  passed: boolean
+  passPercentage: number
   submittedAt: string
   status: string
 }
