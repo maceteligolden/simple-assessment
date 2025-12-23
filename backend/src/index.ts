@@ -21,10 +21,25 @@ setupContainer()
 const app = express()
 
 // Middleware
-// CORS configuration - must specify exact origin when using credentials
+// CORS configuration - support multiple origins (development and production)
+const allowedOrigins = [
+  'http://localhost:3001', // Local development
+  'https://simpleassessments.netlify.app', // Production Netlify
+  ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : []), // Additional origins from env
+]
+
 app.use(
   cors({
-    origin: ENV.CORS_ORIGIN,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true)
+      
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true)
+      } else {
+        callback(new Error('Not allowed by CORS'))
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
