@@ -128,21 +128,31 @@ export interface DeleteExamOutput {
 }
 
 // Get Exam Results (for examiner)
-export interface GetExamResultsInput {
+export interface GetExamResultsInput extends PaginationInput {
   examId: string
 }
 
-export type GetExamResultsOutput = Array<{
-  attemptId: string
-  participantEmail: string
-  score: number
-  maxScore: number
-  percentage: number
-  passed: boolean
-  passPercentage: number
-  submittedAt: string
-  status: string
-}>
+export interface GetExamResultsOutput {
+  data: Array<{
+    attemptId: string
+    participantEmail: string
+    score: number
+    maxScore: number
+    percentage: number
+    passed: boolean
+    passPercentage: number
+    submittedAt: string
+    status: string
+  }>
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+    hasNext: boolean
+    hasPrev: boolean
+  }
+}
 
 // Get Exam by Access Code (for participants)
 export interface GetExamByCodeInput {

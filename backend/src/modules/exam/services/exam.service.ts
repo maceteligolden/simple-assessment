@@ -453,7 +453,11 @@ export class ExamService implements IExamService {
     userId: string
   ): Promise<GetExamResultsOutput> {
     try {
-      logger.debug('Getting exam results', { examId: data.examId, userId })
+      logger.debug('Getting exam results', {
+        examId: data.examId,
+        userId,
+        pagination: data.pagination,
+      })
 
       const exam = await this.examRepository.findById(data.examId)
 
@@ -468,14 +472,27 @@ export class ExamService implements IExamService {
         )
       }
 
-      // Get all attempts for this exam
+      // Get all attempts for this exam with pagination
       const { ExamAttempt } = await import('../../../shared/model')
+      const page = data.pagination.page || 1
+      const limit = data.pagination.limit || 10
+      const skip = (page - 1) * limit
+
+      // Get total count for pagination
+      const total = await ExamAttempt.countDocuments({
+        examId: exam._id,
+        status: EXAM_ATTEMPT_STATUS.SUBMITTED,
+      })
+
+      // Get paginated attempts
       const attempts = await ExamAttempt.find({
         examId: exam._id,
         status: EXAM_ATTEMPT_STATUS.SUBMITTED,
       })
         .populate('userId', 'email')
         .sort({ submittedAt: -1 })
+        .skip(skip)
+        .limit(limit)
 
       const results = attempts.map((attempt: IExamAttempt) => {
         const percentage = attempt.percentage || 0
@@ -493,7 +510,19 @@ export class ExamService implements IExamService {
         }
       })
 
-      return results
+      const totalPages = Math.ceil(total / limit)
+
+      return {
+        data: results,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        },
+      }
     } catch (error) {
       logger.error('Error getting exam results', error)
       throw error

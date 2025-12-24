@@ -402,7 +402,7 @@ router.delete(
  * /api/v1/exams/{id}/results:
  *   get:
  *     summary: Get all results for an exam
- *     description: Get all results for an exam (examiner view) - Examiner only
+ *     description: Get all results for an exam (examiner view) with pagination - Examiner only
  *     tags: [Exams]
  *     security:
  *       - bearerAuth: []
@@ -414,6 +414,21 @@ router.delete(
  *           type: string
  *         description: Exam ID
  *         example: 507f1f77bcf86cd799439011
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Number of items per page
  *     responses:
  *       200:
  *         description: Exam results retrieved successfully
@@ -429,6 +444,21 @@ router.delete(
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/AttemptResult'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                       example: 1
+ *                     limit:
+ *                       type: integer
+ *                       example: 10
+ *                     total:
+ *                       type: integer
+ *                       example: 50
+ *                     totalPages:
+ *                       type: integer
+ *                       example: 5
  *       401:
  *         description: Unauthorized - user not authenticated
  *         content:

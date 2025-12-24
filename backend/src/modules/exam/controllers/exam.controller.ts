@@ -216,9 +216,11 @@ export class ExamController implements IExamController {
     next: NextFunction
   ): Promise<void> {
     try {
-      // Extract exam ID from params
+      // Extract exam ID from params and parse pagination
+      const paginationParams = parsePaginationParams(req.query)
       const input: GetExamResultsInput = {
         examId: req.params.id,
+        pagination: paginationParams,
       }
 
       const result = await this.examService.getExamResults(
@@ -226,9 +228,16 @@ export class ExamController implements IExamController {
         req.user.userId
       )
 
-      ResponseUtil.success(res, result, HTTP_STATUS.OK, {
-        message: 'Exam results retrieved successfully',
-      })
+      ResponseUtil.paginated(
+        res,
+        result.data,
+        result.pagination.page,
+        result.pagination.limit,
+        result.pagination.total,
+        {
+          message: 'Exam results retrieved successfully',
+        }
+      )
     } catch (error) {
       next(error)
     }
