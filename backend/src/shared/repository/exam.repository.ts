@@ -1,39 +1,66 @@
 import { injectable } from 'tsyringe'
 import { IExam, Exam } from '../model/exam.model'
 import { logger } from '../util/logger'
-import { Types } from 'mongoose'
+import { Types, ClientSession } from 'mongoose'
 import { EXAM_ATTEMPT_STATUS } from '../constants'
+
+/**
+ * Repository options for operations that support transactions
+ */
+export interface RepositoryOptions {
+  session?: ClientSession
+}
 
 /**
  * Exam Repository Interface
  */
 export interface IExamRepository {
-  create(data: {
-    title: string
-    description?: string
-    duration: number
-    creatorId: string
-    availableAnytime: boolean
-    startDate?: Date
-    endDate?: Date
-    randomizeQuestions: boolean
-    showResultsImmediately: boolean
-    passPercentage: number
-  }): Promise<IExam>
-  findById(id: string): Promise<IExam | null>
+  create(
+    data: {
+      title: string
+      description?: string
+      duration: number
+      creatorId: string
+      availableAnytime: boolean
+      startDate?: Date
+      endDate?: Date
+      randomizeQuestions: boolean
+      showResultsImmediately: boolean
+      passPercentage: number
+    },
+    options?: RepositoryOptions
+  ): Promise<IExam>
+  findById(id: string, options?: RepositoryOptions): Promise<IExam | null>
   findByCreatorId(
     creatorId: string,
     filters?: {
       search?: string
       isActive?: boolean
-    }
+    },
+    options?: RepositoryOptions
   ): Promise<IExam[]>
-  updateById(id: string, data: Partial<IExam>): Promise<IExam | null>
-  deleteById(id: string): Promise<boolean>
-  addQuestion(examId: string, questionId: string): Promise<IExam | null>
-  removeQuestion(examId: string, questionId: string): Promise<IExam | null>
-  reorderQuestions(examId: string, questionIds: string[]): Promise<IExam | null>
-  hasActiveAttempts(examId: string): Promise<boolean>
+  updateById(
+    id: string,
+    data: Partial<IExam>,
+    options?: RepositoryOptions
+  ): Promise<IExam | null>
+  deleteById(id: string, options?: RepositoryOptions): Promise<boolean>
+  addQuestion(
+    examId: string,
+    questionId: string,
+    options?: RepositoryOptions
+  ): Promise<IExam | null>
+  removeQuestion(
+    examId: string,
+    questionId: string,
+    options?: RepositoryOptions
+  ): Promise<IExam | null>
+  reorderQuestions(
+    examId: string,
+    questionIds: string[],
+    options?: RepositoryOptions
+  ): Promise<IExam | null>
+  hasActiveAttempts(examId: string, options?: RepositoryOptions): Promise<boolean>
 }
 
 /**
@@ -210,16 +237,26 @@ export class ExamRepository implements IExamRepository {
     }
   }
 
-  async addQuestion(examId: string, questionId: string): Promise<IExam | null> {
+  async addQuestion(
+    examId: string,
+    questionId: string,
+    options?: RepositoryOptions
+  ): Promise<IExam | null> {
     try {
       logger.debug('Adding question to exam in repository', {
         examId,
         questionId,
+        hasSession: !!options?.session,
       })
+      const updateOptions: any = { new: true }
+      if (options?.session) {
+        updateOptions.session = options.session
+      }
+      
       const exam = await Exam.findByIdAndUpdate(
         examId,
         { $addToSet: { questions: new Types.ObjectId(questionId) } },
-        { new: true }
+        updateOptions
       )
       return exam
     } catch (error) {
@@ -230,17 +267,24 @@ export class ExamRepository implements IExamRepository {
 
   async removeQuestion(
     examId: string,
-    questionId: string
+    questionId: string,
+    options?: RepositoryOptions
   ): Promise<IExam | null> {
     try {
       logger.debug('Removing question from exam in repository', {
         examId,
         questionId,
+        hasSession: !!options?.session,
       })
+      const updateOptions: any = { new: true }
+      if (options?.session) {
+        updateOptions.session = options.session
+      }
+      
       const exam = await Exam.findByIdAndUpdate(
         examId,
         { $pull: { questions: new Types.ObjectId(questionId) } },
-        { new: true }
+        updateOptions
       )
       return exam
     } catch (error) {

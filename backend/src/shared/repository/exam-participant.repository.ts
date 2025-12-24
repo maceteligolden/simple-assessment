@@ -4,29 +4,40 @@ import {
   ExamParticipant,
 } from '../model/exam-participant.model'
 import { logger } from '../util/logger'
-import { Types } from 'mongoose'
+import { Types, ClientSession } from 'mongoose'
 import { EXAM_ATTEMPT_STATUS } from '../constants'
+
+/**
+ * Repository options for operations that support transactions
+ */
+export interface RepositoryOptions {
+  session?: ClientSession
+}
 
 /**
  * Exam Participant Repository Interface
  */
 export interface IExamParticipantRepository {
-  create(data: {
-    examId: string
-    userId: string
-    email: string
-  }): Promise<IExamParticipant>
-  findById(id: string): Promise<IExamParticipant | null>
-  findByExamId(examId: string): Promise<IExamParticipant[]>
-  findByUserId(userId: string): Promise<IExamParticipant[]>
-  findByAccessCode(accessCode: string): Promise<IExamParticipant | null>
+  create(
+    data: {
+      examId: string
+      userId: string
+      email: string
+    },
+    options?: RepositoryOptions
+  ): Promise<IExamParticipant>
+  findById(id: string, options?: RepositoryOptions): Promise<IExamParticipant | null>
+  findByExamId(examId: string, options?: RepositoryOptions): Promise<IExamParticipant[]>
+  findByUserId(userId: string, options?: RepositoryOptions): Promise<IExamParticipant[]>
+  findByAccessCode(accessCode: string, options?: RepositoryOptions): Promise<IExamParticipant | null>
   findByExamAndUser(
     examId: string,
-    userId: string
+    userId: string,
+    options?: RepositoryOptions
   ): Promise<IExamParticipant | null>
-  markAsUsed(id: string): Promise<boolean>
-  deleteById(id: string): Promise<boolean>
-  hasStartedAttempt(participantId: string): Promise<boolean>
+  markAsUsed(id: string, options?: RepositoryOptions): Promise<boolean>
+  deleteById(id: string, options?: RepositoryOptions): Promise<boolean>
+  hasStartedAttempt(participantId: string, options?: RepositoryOptions): Promise<boolean>
 }
 
 /**
@@ -34,22 +45,33 @@ export interface IExamParticipantRepository {
  */
 @injectable()
 export class ExamParticipantRepository implements IExamParticipantRepository {
-  async create(data: {
-    examId: string
-    userId: string
-    email: string
-  }): Promise<IExamParticipant> {
+  async create(
+    data: {
+      examId: string
+      userId: string
+      email: string
+    },
+    options?: RepositoryOptions
+  ): Promise<IExamParticipant> {
     try {
       logger.debug('Creating exam participant in repository', {
         examId: data.examId,
         email: data.email,
+        hasSession: !!options?.session,
       })
       const participant = new ExamParticipant({
         ...data,
         examId: new Types.ObjectId(data.examId),
         userId: new Types.ObjectId(data.userId),
       })
-      await participant.save()
+      
+      // Use session if provided (for transactions)
+      if (options?.session) {
+        await participant.save({ session: options.session })
+      } else {
+        await participant.save()
+      }
+      
       logger.debug('Exam participant created successfully', {
         participantId: participant._id.toString(),
         accessCode: participant.accessCode,
@@ -149,15 +171,21 @@ export class ExamParticipantRepository implements IExamParticipantRepository {
     }
   }
 
-  async markAsUsed(id: string): Promise<boolean> {
+  async markAsUsed(id: string, options?: RepositoryOptions): Promise<boolean> {
     try {
       logger.debug('Marking exam participant as used in repository', {
         participantId: id,
+        hasSession: !!options?.session,
       })
+      const updateOptions: any = { new: true }
+      if (options?.session) {
+        updateOptions.session = options.session
+      }
+      
       const result = await ExamParticipant.findByIdAndUpdate(
         id,
         { isUsed: true },
-        { new: true }
+        updateOptions
       )
       return !!result
     } catch (error) {
@@ -169,12 +197,18 @@ export class ExamParticipantRepository implements IExamParticipantRepository {
     }
   }
 
-  async deleteById(id: string): Promise<boolean> {
+  async deleteById(id: string, options?: RepositoryOptions): Promise<boolean> {
     try {
       logger.debug('Deleting exam participant in repository', {
         participantId: id,
+        hasSession: !!options?.session,
       })
-      const result = await ExamParticipant.findByIdAndDelete(id)
+      const deleteOptions: any = {}
+      if (options?.session) {
+        deleteOptions.session = options.session
+      }
+      
+      const result = await ExamParticipant.findByIdAndDelete(id, deleteOptions)
       return !!result
     } catch (error) {
       logger.error('Error deleting exam participant in repository', error)

@@ -1,28 +1,43 @@
 import { injectable } from 'tsyringe'
 import { IQuestion, Question } from '../model/question.model'
 import { logger } from '../util/logger'
-import { Types } from 'mongoose'
+import { Types, ClientSession } from 'mongoose'
+
+/**
+ * Repository options for operations that support transactions
+ */
+export interface RepositoryOptions {
+  session?: ClientSession
+}
 
 /**
  * Question Repository Interface
  */
 export interface IQuestionRepository {
-  create(data: {
-    examId: string
-    type: string
-    question: string | Record<string, unknown>
-    options?: string[]
-    correctAnswer: string | string[] | Record<string, unknown>
-    points?: number
-    order: number
-  }): Promise<IQuestion>
-  findById(id: string): Promise<IQuestion | null>
-  findByExamId(examId: string): Promise<IQuestion[]>
-  updateById(id: string, data: Partial<IQuestion>): Promise<IQuestion | null>
-  deleteById(id: string): Promise<boolean>
+  create(
+    data: {
+      examId: string
+      type: string
+      question: string | Record<string, unknown>
+      options?: string[]
+      correctAnswer: string | string[] | Record<string, unknown>
+      points?: number
+      order: number
+    },
+    options?: RepositoryOptions
+  ): Promise<IQuestion>
+  findById(id: string, options?: RepositoryOptions): Promise<IQuestion | null>
+  findByExamId(examId: string, options?: RepositoryOptions): Promise<IQuestion[]>
+  updateById(
+    id: string,
+    data: Partial<IQuestion>,
+    options?: RepositoryOptions
+  ): Promise<IQuestion | null>
+  deleteById(id: string, options?: RepositoryOptions): Promise<boolean>
   updateOrder(
     examId: string,
-    questionOrders: Array<{ id: string; order: number }>
+    questionOrders: Array<{ id: string; order: number }>,
+    options?: RepositoryOptions
   ): Promise<void>
 }
 
@@ -31,26 +46,37 @@ export interface IQuestionRepository {
  */
 @injectable()
 export class QuestionRepository implements IQuestionRepository {
-  async create(data: {
-    examId: string
-    type: string
-    question: string | Record<string, unknown>
-    options?: string[]
-    correctAnswer: string | string[] | Record<string, unknown>
-    points?: number
-    order: number
-  }): Promise<IQuestion> {
+  async create(
+    data: {
+      examId: string
+      type: string
+      question: string | Record<string, unknown>
+      options?: string[]
+      correctAnswer: string | string[] | Record<string, unknown>
+      points?: number
+      order: number
+    },
+    options?: RepositoryOptions
+  ): Promise<IQuestion> {
     try {
       logger.debug('Creating question in repository', {
         examId: data.examId,
         type: data.type,
+        hasSession: !!options?.session,
       })
       const question = new Question({
         ...data,
         examId: new Types.ObjectId(data.examId),
         points: data.points ?? 1,
       })
-      await question.save()
+      
+      // Use session if provided (for transactions)
+      if (options?.session) {
+        await question.save({ session: options.session })
+      } else {
+        await question.save()
+      }
+      
       logger.debug('Question created successfully', {
         questionId: question._id.toString(),
       })
@@ -87,14 +113,23 @@ export class QuestionRepository implements IQuestionRepository {
 
   async updateById(
     id: string,
-    data: Partial<IQuestion>
+    data: Partial<IQuestion>,
+    options?: RepositoryOptions
   ): Promise<IQuestion | null> {
     try {
-      logger.debug('Updating question in repository', { questionId: id })
-      const question = await Question.findByIdAndUpdate(id, data, {
+      logger.debug('Updating question in repository', {
+        questionId: id,
+        hasSession: !!options?.session,
+      })
+      const updateOptions: any = {
         new: true,
         runValidators: true,
-      })
+      }
+      if (options?.session) {
+        updateOptions.session = options.session
+      }
+      
+      const question = await Question.findByIdAndUpdate(id, data, updateOptions)
       return question
     } catch (error) {
       logger.error('Error updating question in repository', error)
@@ -102,10 +137,18 @@ export class QuestionRepository implements IQuestionRepository {
     }
   }
 
-  async deleteById(id: string): Promise<boolean> {
+  async deleteById(id: string, options?: RepositoryOptions): Promise<boolean> {
     try {
-      logger.debug('Deleting question in repository', { questionId: id })
-      const result = await Question.findByIdAndDelete(id)
+      logger.debug('Deleting question in repository', {
+        questionId: id,
+        hasSession: !!options?.session,
+      })
+      const deleteOptions: any = {}
+      if (options?.session) {
+        deleteOptions.session = options.session
+      }
+      
+      const result = await Question.findByIdAndDelete(id, deleteOptions)
       return !!result
     } catch (error) {
       logger.error('Error deleting question in repository', error)

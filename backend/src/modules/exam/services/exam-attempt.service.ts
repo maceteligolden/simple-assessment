@@ -5,7 +5,7 @@ import {
   IExamParticipantRepository,
   IExamAttemptRepository,
 } from '../../../shared/repository'
-import { logger, paginateArray } from '../../../shared/util'
+import { logger, paginateArray, TransactionManager } from '../../../shared/util'
 import { EXAM_ATTEMPT_STATUS } from '../../../shared/constants'
 import {
   StartExamInput,
@@ -169,33 +169,47 @@ export class ExamAttemptService implements IExamAttemptService {
         questionOrder = this.shuffleArray([...questionOrder])
       }
 
-      // Create attempt
-      const attempt = await this.attemptRepository.create({
-        examId: exam._id.toString(),
-        participantId: participant._id.toString(),
-        userId: userId,
-        questionOrder,
-      })
+      // Use transaction to ensure atomicity: create attempt + mark participant as used + update status
+      const updatedAttempt = await TransactionManager.withTransaction(
+        async session => {
+          // 1. Create attempt (with session)
+          const attempt = await this.attemptRepository.create(
+            {
+              examId: exam._id.toString(),
+              participantId: participant._id.toString(),
+              userId: userId,
+              questionOrder,
+            },
+            { session }
+          )
 
-      // Mark access code as used
-      await this.participantRepository.markAsUsed(participant._id.toString())
+          // 2. Mark access code as used (with session)
+          await this.participantRepository.markAsUsed(
+            participant._id.toString(),
+            { session }
+          )
 
-      // Start attempt
-      const startedAt = new Date()
-      const durationSeconds = exam.duration * 60
-      const updatedAttempt = await this.attemptRepository.updateById(
-        attempt._id.toString(),
-        {
-          status: EXAM_ATTEMPT_STATUS.IN_PROGRESS,
-          startedAt,
-          timeRemaining: durationSeconds,
-          lastActivityAt: startedAt,
+          // 3. Start attempt - update status (with session)
+          const startedAt = new Date()
+          const durationSeconds = exam.duration * 60
+          const updated = await this.attemptRepository.updateById(
+            attempt._id.toString(),
+            {
+              status: EXAM_ATTEMPT_STATUS.IN_PROGRESS,
+              startedAt,
+              timeRemaining: durationSeconds,
+              lastActivityAt: startedAt,
+            },
+            { session }
+          )
+
+          if (!updated) {
+            throw new InternalServerError('Failed to start exam attempt')
+          }
+
+          return updated
         }
       )
-
-      if (!updatedAttempt) {
-        throw new InternalServerError('Failed to start exam attempt')
-      }
 
       logger.info('Exam started successfully', {
         attemptId: updatedAttempt._id.toString(),
@@ -510,26 +524,33 @@ export class ExamAttemptService implements IExamAttemptService {
         throw new BadRequestError('Exam time has expired')
       }
 
-      // Mark exam
+      // Mark exam (read-only operation, no transaction needed)
       const markingResult = await this.markExam(attempt, questions)
 
-      // Update attempt
+      // Use transaction to ensure atomicity: update attempt with scores and status
       const submittedAt = new Date()
-      const updatedAttempt = await this.attemptRepository.updateById(
-        attempt._id.toString(),
-        {
-          status: EXAM_ATTEMPT_STATUS.SUBMITTED,
-          submittedAt,
-          score: markingResult.score,
-          maxScore: markingResult.maxScore,
-          percentage: markingResult.percentage,
-          timeRemaining,
+      const updatedAttempt = await TransactionManager.withTransaction(
+        async session => {
+          const updated = await this.attemptRepository.updateById(
+            attempt._id.toString(),
+            {
+              status: EXAM_ATTEMPT_STATUS.SUBMITTED,
+              submittedAt,
+              score: markingResult.score,
+              maxScore: markingResult.maxScore,
+              percentage: markingResult.percentage,
+              timeRemaining,
+            },
+            { session }
+          )
+
+          if (!updated) {
+            throw new InternalServerError('Failed to submit exam')
+          }
+
+          return updated
         }
       )
-
-      if (!updatedAttempt) {
-        throw new InternalServerError('Failed to submit exam')
-      }
 
       logger.info('Exam submitted successfully', {
         attemptId: updatedAttempt._id.toString(),

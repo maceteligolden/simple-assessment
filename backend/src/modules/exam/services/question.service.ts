@@ -3,7 +3,7 @@ import { IExamRepository } from '../../../shared/repository/exam.repository'
 import { IQuestionRepository } from '../../../shared/repository/question.repository'
 import { QuestionFactory } from '../factory/question.factory'
 import { QuestionType, IQuestion } from '../../../shared/model/question.model'
-import { logger } from '../../../shared/util/logger'
+import { logger, TransactionManager } from '../../../shared/util'
 import {
   AddQuestionInput,
   AddQuestionOutput,
@@ -104,21 +104,32 @@ export class QuestionService implements IQuestionService {
         )
       }
 
-      // Create question in database
-      const question = await this.questionRepository.create({
-        examId: exam._id.toString(),
-        type: structuredQuestion.type,
-        question: structuredQuestion.question,
-        options: structuredQuestion.options,
-        correctAnswer: structuredQuestion.correctAnswer,
-        points: structuredQuestion.points,
-        order: structuredQuestion.order,
-      })
+      // Use transaction to ensure atomicity: create question + add to exam
+      const question = await TransactionManager.withTransaction(
+        async session => {
+          // 1. Create question in database (with session)
+          const createdQuestion = await this.questionRepository.create(
+            {
+              examId: exam._id.toString(),
+              type: structuredQuestion.type,
+              question: structuredQuestion.question,
+              options: structuredQuestion.options,
+              correctAnswer: structuredQuestion.correctAnswer,
+              points: structuredQuestion.points,
+              order: structuredQuestion.order,
+            },
+            { session }
+          )
 
-      // Add question to exam
-      await this.examRepository.addQuestion(
-        exam._id.toString(),
-        question._id.toString()
+          // 2. Add question to exam (with session)
+          await this.examRepository.addQuestion(
+            exam._id.toString(),
+            createdQuestion._id.toString(),
+            { session }
+          )
+
+          return createdQuestion
+        }
       )
 
       logger.info('Question added successfully', {
@@ -322,14 +333,20 @@ export class QuestionService implements IQuestionService {
         throw new BadRequestError('Question does not belong to this exam')
       }
 
-      // Remove question from exam
-      await this.examRepository.removeQuestion(
-        exam._id.toString(),
-        question._id.toString()
-      )
+      // Use transaction to ensure atomicity: remove from exam + delete question
+      await TransactionManager.withTransaction(async session => {
+        // 1. Remove question from exam (with session)
+        await this.examRepository.removeQuestion(
+          exam._id.toString(),
+          question._id.toString(),
+          { session }
+        )
 
-      // Delete question
-      await this.questionRepository.deleteById(question._id.toString())
+        // 2. Delete question (with session)
+        await this.questionRepository.deleteById(question._id.toString(), {
+          session,
+        })
+      })
 
       logger.info('Question deleted successfully', {
         questionId: question._id.toString(),

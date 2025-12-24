@@ -5,37 +5,53 @@ import {
   AttemptStatus,
 } from '../model/exam-attempt.model'
 import { logger } from '../util/logger'
-import { Types } from 'mongoose'
+import { Types, ClientSession } from 'mongoose'
 import { EXAM_ATTEMPT_STATUS } from '../constants'
+
+/**
+ * Repository options for operations that support transactions
+ */
+export interface RepositoryOptions {
+  session?: ClientSession
+}
 
 /**
  * Exam Attempt Repository Interface
  */
 export interface IExamAttemptRepository {
-  create(data: {
-    examId: string
-    participantId: string
-    userId: string
-    questionOrder: number[]
-  }): Promise<IExamAttempt>
-  findById(id: string): Promise<IExamAttempt | null>
+  create(
+    data: {
+      examId: string
+      participantId: string
+      userId: string
+      questionOrder: number[]
+    },
+    options?: RepositoryOptions
+  ): Promise<IExamAttempt>
+  findById(id: string, options?: RepositoryOptions): Promise<IExamAttempt | null>
   findByExamAndUser(
     examId: string,
-    userId: string
+    userId: string,
+    options?: RepositoryOptions
   ): Promise<IExamAttempt | null>
-  findByParticipant(participantId: string): Promise<IExamAttempt | null>
+  findByParticipant(
+    participantId: string,
+    options?: RepositoryOptions
+  ): Promise<IExamAttempt | null>
   updateById(
     id: string,
-    data: Partial<IExamAttempt>
+    data: Partial<IExamAttempt>,
+    options?: RepositoryOptions
   ): Promise<IExamAttempt | null>
   updateAnswer(
     attemptId: string,
     questionId: string,
-    answer: string | string[]
+    answer: string | string[],
+    options?: RepositoryOptions
   ): Promise<IExamAttempt | null>
-  markAsAbandoned(id: string): Promise<boolean>
-  updateActivity(id: string): Promise<IExamAttempt | null>
-  findByUserId(userId: string): Promise<IExamAttempt[]>
+  markAsAbandoned(id: string, options?: RepositoryOptions): Promise<boolean>
+  updateActivity(id: string, options?: RepositoryOptions): Promise<IExamAttempt | null>
+  findByUserId(userId: string, options?: RepositoryOptions): Promise<IExamAttempt[]>
 }
 
 /**
@@ -43,16 +59,20 @@ export interface IExamAttemptRepository {
  */
 @injectable()
 export class ExamAttemptRepository implements IExamAttemptRepository {
-  async create(data: {
-    examId: string
-    participantId: string
-    userId: string
-    questionOrder: number[]
-  }): Promise<IExamAttempt> {
+  async create(
+    data: {
+      examId: string
+      participantId: string
+      userId: string
+      questionOrder: number[]
+    },
+    options?: RepositoryOptions
+  ): Promise<IExamAttempt> {
     try {
       logger.debug('Creating exam attempt in repository', {
         examId: data.examId,
         userId: data.userId,
+        hasSession: !!options?.session,
       })
       const attempt = new ExamAttempt({
         ...data,
@@ -61,7 +81,14 @@ export class ExamAttemptRepository implements IExamAttemptRepository {
         userId: new Types.ObjectId(data.userId),
         status: EXAM_ATTEMPT_STATUS.NOT_STARTED,
       })
-      await attempt.save()
+      
+      // Use session if provided (for transactions)
+      if (options?.session) {
+        await attempt.save({ session: options.session })
+      } else {
+        await attempt.save()
+      }
+      
       logger.debug('Exam attempt created successfully', {
         attemptId: attempt._id.toString(),
       })
@@ -133,14 +160,25 @@ export class ExamAttemptRepository implements IExamAttemptRepository {
 
   async updateById(
     id: string,
-    data: Partial<IExamAttempt>
+    data: Partial<IExamAttempt>,
+    options?: RepositoryOptions
   ): Promise<IExamAttempt | null> {
     try {
-      logger.debug('Updating exam attempt in repository', { attemptId: id })
-      const attempt = await ExamAttempt.findByIdAndUpdate(id, data, {
+      logger.debug('Updating exam attempt in repository', {
+        attemptId: id,
+        hasSession: !!options?.session,
+      })
+      const updateOptions: any = {
         new: true,
         runValidators: true,
-      })
+      }
+      
+      // Add session to options if provided
+      if (options?.session) {
+        updateOptions.session = options.session
+      }
+      
+      const attempt = await ExamAttempt.findByIdAndUpdate(id, data, updateOptions)
       return attempt
     } catch (error) {
       logger.error('Error updating exam attempt in repository', error)
@@ -151,14 +189,22 @@ export class ExamAttemptRepository implements IExamAttemptRepository {
   async updateAnswer(
     attemptId: string,
     questionId: string,
-    answer: string | string[]
+    answer: string | string[],
+    options?: RepositoryOptions
   ): Promise<IExamAttempt | null> {
     try {
       logger.debug('Updating answer in exam attempt in repository', {
         attemptId,
         questionId,
+        hasSession: !!options?.session,
       })
-      const attempt = await ExamAttempt.findById(attemptId)
+      
+      const findOptions: any = {}
+      if (options?.session) {
+        findOptions.session = options.session
+      }
+      
+      const attempt = await ExamAttempt.findById(attemptId, null, findOptions)
       if (!attempt) {
         return null
       }
@@ -180,7 +226,13 @@ export class ExamAttemptRepository implements IExamAttemptRepository {
         attempt.answeredQuestions.sort((a, b) => a - b)
       }
 
-      await attempt.save()
+      // Use session if provided
+      if (options?.session) {
+        await attempt.save({ session: options.session })
+      } else {
+        await attempt.save()
+      }
+      
       return attempt
     } catch (error) {
       logger.error('Error updating answer in exam attempt in repository', error)
@@ -188,18 +240,24 @@ export class ExamAttemptRepository implements IExamAttemptRepository {
     }
   }
 
-  async markAsAbandoned(id: string): Promise<boolean> {
+  async markAsAbandoned(id: string, options?: RepositoryOptions): Promise<boolean> {
     try {
       logger.debug('Marking exam attempt as abandoned in repository', {
         attemptId: id,
+        hasSession: !!options?.session,
       })
+      const updateOptions: any = { new: true }
+      if (options?.session) {
+        updateOptions.session = options.session
+      }
+      
       const result = await ExamAttempt.findByIdAndUpdate(
         id,
         {
           status: EXAM_ATTEMPT_STATUS.ABANDONED,
           abandonedAt: new Date(),
         },
-        { new: true }
+        updateOptions
       )
       return !!result
     } catch (error) {
@@ -211,15 +269,21 @@ export class ExamAttemptRepository implements IExamAttemptRepository {
     }
   }
 
-  async updateActivity(id: string): Promise<IExamAttempt | null> {
+  async updateActivity(id: string, options?: RepositoryOptions): Promise<IExamAttempt | null> {
     try {
       logger.debug('Updating exam attempt activity in repository', {
         attemptId: id,
+        hasSession: !!options?.session,
       })
+      const updateOptions: any = { new: true }
+      if (options?.session) {
+        updateOptions.session = options.session
+      }
+      
       const attempt = await ExamAttempt.findByIdAndUpdate(
         id,
         { lastActivityAt: new Date() },
-        { new: true }
+        updateOptions
       )
       return attempt
     } catch (error) {

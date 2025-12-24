@@ -3,7 +3,7 @@ import { IUserRepository } from '../../shared/repository/user.repository'
 import { ISessionService } from '../../shared/service/session.service'
 import { hashPassword, comparePassword } from '../../shared/util/password'
 import { generateTokens, verifyRefreshToken } from '../../shared/util/jwt'
-import { logger } from '../../shared/util/logger'
+import { logger, TransactionManager } from '../../shared/util'
 import { extractIpAddress, extractUserAgent } from '../../shared/util/session'
 import {
   SignUpInput,
@@ -24,7 +24,7 @@ import {
 } from '../../shared/errors'
 import { IUser } from '../../shared/model/user.model'
 import { Types } from 'mongoose'
-import { UserRole } from '../../shared/constants'
+import { UserRole } from '../../shared/constants/user-roles'
 
 /**
  * User data structure for mapping to response
@@ -103,49 +103,66 @@ export class AuthService implements IAuthService {
         role: data.role,
       }
 
-      // Create user
-      let user: IUser
-      try {
-        user = await this.userRepository.create(userData)
-      } catch (error) {
-        logger.error('User creation failed during sign up', error)
-        // Check if it's a duplicate email error from MongoDB
-        if (
-          error instanceof Error &&
-          (error.message.includes('duplicate') ||
-            error.message.includes('E11000') ||
-            error.message.includes('unique'))
-        ) {
-          throw new ConflictError('An account with this email already exists')
+      // Use transaction to ensure atomicity: create user + update refresh token
+      const result = await TransactionManager.withTransaction<{
+        user: IUser
+        accessToken: string
+        refreshToken: string
+      }>(async session => {
+        // 1. Create user (with session)
+        let createdUser: IUser
+        try {
+          createdUser = await this.userRepository.create(userData, { session })
+        } catch (error) {
+          logger.error('User creation failed during sign up', error)
+          // Check if it's a duplicate email error from MongoDB
+          if (
+            error instanceof Error &&
+            (error.message.includes('duplicate') ||
+              error.message.includes('E11000') ||
+              error.message.includes('unique'))
+          ) {
+            throw new ConflictError('An account with this email already exists')
+          }
+          throw new InternalServerError(
+            'Failed to create user account. Please try again.'
+          )
         }
-        throw new InternalServerError(
-          'Failed to create user account. Please try again.'
-        )
-      }
 
-      logger.info('User registered successfully', {
-        userId: user._id.toString(),
-        email: user.email,
-        role: user.role,
-      })
-
-      // Generate tokens
-      const { accessToken, refreshToken } = generateTokens({
-        userId: user._id.toString(),
-        email: user.email,
-        role: user.role,
-      })
-
-      // Save refresh token to database
-      const updatedUser = await this.userRepository.updateRefreshToken(
-        user._id.toString(),
-        refreshToken
-      )
-      if (!updatedUser) {
-        logger.warn('Failed to save refresh token, but user was created', {
-          userId: user._id.toString(),
+        logger.info('User registered successfully', {
+          userId: createdUser._id.toString(),
+          email: createdUser.email,
+          role: createdUser.role,
         })
-      }
+
+        // 2. Generate tokens
+        const tokens = generateTokens({
+          userId: createdUser._id.toString(),
+          email: createdUser.email,
+          role: createdUser.role,
+        })
+
+        // 3. Save refresh token to database (with session)
+        const updatedUser = await this.userRepository.updateRefreshToken(
+          createdUser._id.toString(),
+          tokens.refreshToken,
+          { session }
+        )
+
+        if (!updatedUser) {
+          throw new InternalServerError(
+            'Failed to save refresh token during sign up'
+          )
+        }
+
+        return {
+          user: updatedUser,
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+        }
+      })
+
+      const { user, accessToken, refreshToken } = result
 
       logger.debug('Refresh token saved to database', {
         userId: user._id.toString(),

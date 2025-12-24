@@ -9,20 +9,33 @@ let isConnected = false
 
 /**
  * Database connection options
+ * Optimized for write-heavy workloads
  */
 const connectionOptions: mongoose.ConnectOptions = {
-  // Connection pool settings
-  maxPoolSize: 10, // Maintain up to 10 socket connections
-  minPoolSize: 2, // Maintain at least 2 socket connections
-  socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-  serverSelectionTimeoutMS: 3000, // How long to try before timing out (reduced for faster failure)
+  // Connection Pool Settings (optimized for write-heavy workloads)
+  maxPoolSize: ENV.MONGODB_MAX_POOL_SIZE, // Increased for write-heavy operations
+  minPoolSize: ENV.MONGODB_MIN_POOL_SIZE, // Maintain warm connections
+  maxIdleTimeMS: ENV.MONGODB_MAX_IDLE_TIME_MS, // Close idle connections after 30 seconds
+  waitQueueTimeoutMS: ENV.MONGODB_WAIT_QUEUE_TIMEOUT_MS, // Max wait time for connection from pool
 
-  // Retry settings
-  retryWrites: true,
-  retryReads: true,
+  // Timeout Settings
+  connectTimeoutMS: ENV.MONGODB_CONNECT_TIMEOUT_MS, // Connection establishment timeout
+  socketTimeoutMS: ENV.MONGODB_SOCKET_TIMEOUT_MS, // Socket inactivity timeout
+  serverSelectionTimeoutMS: ENV.MONGODB_SERVER_SELECTION_TIMEOUT_MS, // Server selection timeout
 
-  // Connection timeout
-  connectTimeoutMS: 3000, // Timeout after 3 seconds if connection can't be established
+  // Retry Settings
+  retryWrites: true, // Automatically retry write operations on transient failures
+  retryReads: true, // Automatically retry read operations on transient failures
+
+  // Compression (reduces network bandwidth for write-heavy workloads)
+  compressors: ENV.MONGODB_COMPRESSION_ENABLED ? ['zlib'] : [],
+  zlibCompressionLevel: Math.min(
+    Math.max(ENV.MONGODB_ZLIB_COMPRESSION_LEVEL, 0),
+    9
+  ) as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9, // Balance between CPU and compression (0-9)
+
+  // Heartbeat Settings
+  heartbeatFrequencyMS: ENV.MONGODB_HEARTBEAT_FREQUENCY_MS, // Check server status frequency
 }
 
 /**
@@ -49,6 +62,15 @@ export async function connectDatabase(): Promise<void> {
       port: mongoose.connection.port,
       database: mongoose.connection.name,
       readyState: mongoose.connection.readyState,
+      poolSize: {
+        max: ENV.MONGODB_MAX_POOL_SIZE,
+        min: ENV.MONGODB_MIN_POOL_SIZE,
+      },
+      compression: ENV.MONGODB_COMPRESSION_ENABLED
+        ? `zlib (level ${ENV.MONGODB_ZLIB_COMPRESSION_LEVEL})`
+        : 'disabled',
+      retryWrites: true,
+      retryReads: true,
     })
 
     // Set up connection event listeners

@@ -6,31 +6,50 @@ import {
   UserFilters,
 } from '../../modules/auth/interfaces/auth.interface'
 import { logger } from '../util/logger'
+import { ClientSession } from 'mongoose'
+
+/**
+ * Repository options for operations that support transactions
+ */
+export interface RepositoryOptions {
+  session?: ClientSession
+}
 
 /**
  * User Repository Interface
  * Defines the contract for user data access
  */
 export interface IUserRepository {
-  create(data: CreateUserInput): Promise<IUser>
+  create(data: CreateUserInput, options?: RepositoryOptions): Promise<IUser>
   findById(
     id: string,
     includePassword?: boolean,
-    includeRefreshToken?: boolean
+    includeRefreshToken?: boolean,
+    options?: RepositoryOptions
   ): Promise<IUser | null>
   findByEmail(
     email: string,
     includePassword?: boolean,
-    includeRefreshToken?: boolean
+    includeRefreshToken?: boolean,
+    options?: RepositoryOptions
   ): Promise<IUser | null>
   findOne(
     filters: UserFilters,
     includePassword?: boolean,
-    includeRefreshToken?: boolean
+    includeRefreshToken?: boolean,
+    options?: RepositoryOptions
   ): Promise<IUser | null>
-  updateById(id: string, data: UpdateUserInput): Promise<IUser | null>
-  updateRefreshToken(id: string, refreshToken: string): Promise<IUser | null>
-  deleteById(id: string): Promise<boolean>
+  updateById(
+    id: string,
+    data: UpdateUserInput,
+    options?: RepositoryOptions
+  ): Promise<IUser | null>
+  updateRefreshToken(
+    id: string,
+    refreshToken: string,
+    options?: RepositoryOptions
+  ): Promise<IUser | null>
+  deleteById(id: string, options?: RepositoryOptions): Promise<boolean>
 }
 
 /**
@@ -42,14 +61,25 @@ export class UserRepository implements IUserRepository {
   /**
    * Create a new user
    */
-  async create(data: CreateUserInput): Promise<IUser> {
+  async create(
+    data: CreateUserInput,
+    options?: RepositoryOptions
+  ): Promise<IUser> {
     try {
       logger.debug('Creating user in repository', {
         email: data.email,
         role: data.role,
+        hasSession: !!options?.session,
       })
       const user = new User(data)
-      await user.save()
+
+      // Use session if provided (for transactions)
+      if (options?.session) {
+        await user.save({ session: options.session })
+      } else {
+        await user.save()
+      }
+
       logger.debug('User created successfully in repository', {
         userId: user._id.toString(),
       })
@@ -163,14 +193,26 @@ export class UserRepository implements IUserRepository {
    */
   async updateRefreshToken(
     id: string,
-    refreshToken: string
+    refreshToken: string,
+    options?: RepositoryOptions
   ): Promise<IUser | null> {
     try {
-      logger.debug('Updating refresh token in repository', { userId: id })
+      logger.debug('Updating refresh token in repository', {
+        userId: id,
+        hasSession: !!options?.session,
+      })
+      const updateOptions: {
+        new: boolean
+        session?: ClientSession
+      } = { new: true }
+      if (options?.session) {
+        updateOptions.session = options.session
+      }
+
       const user = await User.findByIdAndUpdate(
         id,
         { refreshToken },
-        { new: true }
+        updateOptions
       )
       return user
     } catch (error) {

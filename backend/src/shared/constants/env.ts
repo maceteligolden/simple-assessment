@@ -27,6 +27,52 @@ export const ENV = {
   MONGODB_URI:
     process.env.MONGODB_URI || 'mongodb://localhost:27017/simple-assessment',
 
+  // MongoDB Connection Pool Configuration
+  MONGODB_MAX_POOL_SIZE: parseInt(
+    process.env.MONGODB_MAX_POOL_SIZE || '50',
+    10
+  ), // Maximum connections in pool (increased for write-heavy workloads)
+  MONGODB_MIN_POOL_SIZE: parseInt(
+    process.env.MONGODB_MIN_POOL_SIZE || '10',
+    10
+  ), // Minimum connections to maintain (warm connections)
+  MONGODB_MAX_IDLE_TIME_MS: parseInt(
+    process.env.MONGODB_MAX_IDLE_TIME_MS || '30000',
+    10
+  ), // Close idle connections after 30 seconds
+
+  // MongoDB Timeout Configuration
+  MONGODB_CONNECT_TIMEOUT_MS: parseInt(
+    process.env.MONGODB_CONNECT_TIMEOUT_MS || '10000',
+    10
+  ), // Connection timeout: 10 seconds
+  MONGODB_SOCKET_TIMEOUT_MS: parseInt(
+    process.env.MONGODB_SOCKET_TIMEOUT_MS || '45000',
+    10
+  ), // Socket timeout: 45 seconds
+  MONGODB_SERVER_SELECTION_TIMEOUT_MS: parseInt(
+    process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS || '5000',
+    10
+  ), // Server selection timeout: 5 seconds
+  MONGODB_WAIT_QUEUE_TIMEOUT_MS: parseInt(
+    process.env.MONGODB_WAIT_QUEUE_TIMEOUT_MS || '10000',
+    10
+  ), // Max wait time for connection from pool: 10 seconds
+
+  // MongoDB Compression
+  MONGODB_COMPRESSION_ENABLED:
+    process.env.MONGODB_COMPRESSION_ENABLED !== 'false', // Default: true
+  MONGODB_ZLIB_COMPRESSION_LEVEL: parseInt(
+    process.env.MONGODB_ZLIB_COMPRESSION_LEVEL || '6',
+    10
+  ), // Zlib compression level (1-9, default: 6)
+
+  // MongoDB Heartbeat
+  MONGODB_HEARTBEAT_FREQUENCY_MS: parseInt(
+    process.env.MONGODB_HEARTBEAT_FREQUENCY_MS || '10000',
+    10
+  ), // Heartbeat check frequency: 10 seconds
+
   // JWT
   JWT_SECRET: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '15m', // Access token expires in 15 minutes
