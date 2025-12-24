@@ -4,10 +4,11 @@ import { logger } from '../util/logger'
 import { Types, ClientSession } from 'mongoose'
 
 /**
- * Repository options for operations that support transactions
+ * Repository options for operations that support transactions and optimistic locking
  */
 export interface RepositoryOptions {
   session?: ClientSession
+  expectedVersion?: number // For optimistic locking - expected version of the document
 }
 
 /**
@@ -120,18 +121,51 @@ export class QuestionRepository implements IQuestionRepository {
       logger.debug('Updating question in repository', {
         questionId: id,
         hasSession: !!options?.session,
+        expectedVersion: options?.expectedVersion,
       })
-      const updateOptions: any = {
+
+      // If expectedVersion is provided, validate it before updating
+      if (options?.expectedVersion !== undefined) {
+        const currentQuestion = await Question.findById(id)
+        if (!currentQuestion) {
+          return null
+        }
+
+        if (currentQuestion.version !== options.expectedVersion) {
+          const { OptimisticLockError } = await import('../errors')
+          throw new OptimisticLockError(
+            'Question was modified by another user. Please refresh and try again.',
+            currentQuestion.version,
+            options.expectedVersion,
+            { questionId: id }
+          )
+        }
+      }
+
+      const updateOptions: {
+        new: boolean
+        runValidators: boolean
+        session?: ClientSession
+      } = {
         new: true,
         runValidators: true,
       }
+
       if (options?.session) {
         updateOptions.session = options.session
       }
-      
+
       const question = await Question.findByIdAndUpdate(id, data, updateOptions)
       return question
     } catch (error) {
+      // Re-throw OptimisticLockError as-is
+      if (
+        error instanceof Error &&
+        (error.name === 'OptimisticLockError' ||
+          error.constructor.name === 'OptimisticLockError')
+      ) {
+        throw error
+      }
       logger.error('Error updating question in repository', error)
       throw error
     }

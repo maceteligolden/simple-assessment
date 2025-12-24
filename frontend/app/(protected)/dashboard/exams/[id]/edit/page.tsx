@@ -115,9 +115,11 @@ export default function EditExamPage() {
       examId,
       title: examData.title,
       questionCount: examData.questions.length,
+      version: exam.version,
     })
 
-    const result = await updateExam(examId, examData)
+    // Pass version for optimistic locking
+    const result = await updateExam(examId, examData, exam.version)
 
     if (result.success && result.exam) {
       // Use the original exam data to populate the success modal
@@ -131,7 +133,7 @@ export default function EditExamPage() {
       setUpdatedExam(updatedExamForModal)
       setShowSuccessModal(true)
       toastSuccess('Exam updated successfully!')
-      // Refetch exam to get updated data
+      // Refetch exam to get updated data (including new version)
       refetchExam()
       // Reset form after a short delay to allow modal to show
       setTimeout(() => {
@@ -139,7 +141,20 @@ export default function EditExamPage() {
         setExamData(null)
       }, 100)
     } else {
-      toastError(result.error || 'Failed to update exam.')
+      // Handle version conflicts
+      if (result.isConflict) {
+        toastError(
+          'This exam was modified by another user. Refreshing the latest version...'
+        )
+        // Refetch to get the latest version
+        refetchExam()
+        // Reset to form step to allow user to review changes
+        setTimeout(() => {
+          setStep('form')
+        }, 1000)
+      } else {
+        toastError(result.error || 'Failed to update exam.')
+      }
     }
   }
 

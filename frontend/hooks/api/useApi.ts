@@ -180,7 +180,13 @@ export function useApi() {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = errorData.error?.message || errorData.message || `HTTP error! status: ${response.status}`
-        throw new Error(errorMessage)
+        
+        // Create error with status code for optimistic locking detection
+        const error: any = new Error(errorMessage)
+        error.status = response.status
+        error.statusCode = response.status
+        error.data = errorData
+        throw error
       }
 
       let jsonResponse

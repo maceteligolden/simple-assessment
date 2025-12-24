@@ -18,6 +18,8 @@ import {
   NotFoundError,
   ForbiddenError,
   InternalServerError,
+  OptimisticLockError,
+  ConflictError,
 } from '../../../shared/errors'
 
 /**
@@ -141,7 +143,11 @@ export class QuestionService implements IQuestionService {
       const questionHandler = QuestionFactory.create(question.type)
       const renderedQuestion = questionHandler.render(question)
 
-      return renderedQuestion
+      // Add version for optimistic locking
+      return {
+        ...renderedQuestion,
+        version: question.version,
+      }
     } catch (error) {
       logger.error('Error adding question', error)
       throw error
@@ -259,24 +265,47 @@ export class QuestionService implements IQuestionService {
         }
       }
 
-      const updatedQuestion = await this.questionRepository.updateById(
-        question._id.toString(),
-        updateData
-      )
+      // Get version from input if provided (for optimistic locking)
+      const expectedVersion = data.version
 
-      if (!updatedQuestion) {
-        throw new InternalServerError('Failed to update question')
+      try {
+        const updatedQuestion = await this.questionRepository.updateById(
+          question._id.toString(),
+          updateData,
+          { expectedVersion }
+        )
+
+        if (!updatedQuestion) {
+          throw new InternalServerError('Failed to update question')
+        }
+
+        logger.info('Question updated successfully', {
+          questionId: updatedQuestion._id.toString(),
+        })
+
+        // Render question using factory (excludes sensitive data like correctAnswer)
+        const questionHandler = QuestionFactory.create(updatedQuestion.type)
+        const renderedQuestion = questionHandler.render(updatedQuestion)
+
+        // Add version for optimistic locking
+        return {
+          ...renderedQuestion,
+          version: updatedQuestion.version,
+        }
+      } catch (error) {
+        // Handle optimistic lock conflicts
+        if (error instanceof OptimisticLockError) {
+          logger.warn('Optimistic lock conflict during question update', {
+            questionId: data.questionId,
+            currentVersion: error.currentVersion,
+            expectedVersion: error.expectedVersion,
+          })
+          throw new ConflictError(
+            'Question was modified by another user. Please refresh and try again.'
+          )
+        }
+        throw error
       }
-
-      logger.info('Question updated successfully', {
-        questionId: updatedQuestion._id.toString(),
-      })
-
-      // Render question using factory (excludes sensitive data like correctAnswer)
-      const questionHandler = QuestionFactory.create(updatedQuestion.type)
-      const renderedQuestion = questionHandler.render(updatedQuestion)
-
-      return renderedQuestion
     } catch (error) {
       logger.error('Error updating question', error)
       throw error

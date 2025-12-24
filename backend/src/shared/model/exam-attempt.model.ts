@@ -33,6 +33,7 @@ export interface IExamAttempt extends Document {
   score?: number
   maxScore?: number
   percentage?: number
+  version: number // Optimistic locking version field
   createdAt: Date
   updatedAt: Date
 }
@@ -121,9 +122,14 @@ const examAttemptSchema = new Schema<IExamAttempt>(
     percentage: {
       type: Number,
     },
+    version: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
+    optimisticConcurrency: true, // Enable optimistic locking
   }
 )
 

@@ -5,10 +5,11 @@ import { Types, ClientSession } from 'mongoose'
 import { EXAM_ATTEMPT_STATUS } from '../constants'
 
 /**
- * Repository options for operations that support transactions
+ * Repository options for operations that support transactions and optimistic locking
  */
 export interface RepositoryOptions {
   session?: ClientSession
+  expectedVersion?: number // For optimistic locking - expected version of the document
 }
 
 /**
@@ -208,15 +209,60 @@ export class ExamRepository implements IExamRepository {
     }
   }
 
-  async updateById(id: string, data: Partial<IExam>): Promise<IExam | null> {
+  async updateById(
+    id: string,
+    data: Partial<IExam>,
+    options?: RepositoryOptions
+  ): Promise<IExam | null> {
     try {
-      logger.debug('Updating exam in repository', { examId: id })
-      const exam = await Exam.findByIdAndUpdate(id, data, {
+      logger.debug('Updating exam in repository', {
+        examId: id,
+        hasSession: !!options?.session,
+        expectedVersion: options?.expectedVersion,
+      })
+
+      // If expectedVersion is provided, validate it before updating
+      if (options?.expectedVersion !== undefined) {
+        const currentExam = await Exam.findById(id)
+        if (!currentExam) {
+          return null
+        }
+
+        if (currentExam.version !== options.expectedVersion) {
+          const { OptimisticLockError } = await import('../errors')
+          throw new OptimisticLockError(
+            'Exam was modified by another user. Please refresh and try again.',
+            currentExam.version,
+            options.expectedVersion,
+            { examId: id }
+          )
+        }
+      }
+
+      const updateOptions: {
+        new: boolean
+        runValidators: boolean
+        session?: ClientSession
+      } = {
         new: true,
         runValidators: true,
-      })
+      }
+
+      if (options?.session) {
+        updateOptions.session = options.session
+      }
+
+      const exam = await Exam.findByIdAndUpdate(id, data, updateOptions)
       return exam
     } catch (error) {
+      // Re-throw OptimisticLockError as-is
+      if (
+        error instanceof Error &&
+        (error.name === 'OptimisticLockError' ||
+          error.constructor.name === 'OptimisticLockError')
+      ) {
+        throw error
+      }
       logger.error('Error updating exam in repository', error)
       throw error
     }

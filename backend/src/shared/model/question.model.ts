@@ -11,6 +11,7 @@ export interface IQuestion extends Document {
   correctAnswer: string | string[] | Record<string, unknown> // Type-specific
   points: number
   order: number
+  version: number // Optimistic locking version field
   createdAt: Date
   updatedAt: Date
 }
@@ -58,9 +59,14 @@ const questionSchema = new Schema<IQuestion>(
       required: [true, 'Question order is required'],
       min: [0, 'Order cannot be negative'],
     },
+    version: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
+    optimisticConcurrency: true, // Enable optimistic locking
   }
 )
 

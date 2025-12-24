@@ -15,6 +15,7 @@ export interface IExam extends Document {
   isActive: boolean
   isDeleted: boolean
   questions: Types.ObjectId[] // References to questions
+  version: number // Optimistic locking version field
   createdAt: Date
   updatedAt: Date
 }
@@ -100,9 +101,14 @@ const examSchema = new Schema<IExam>(
         ref: 'Question',
       },
     ],
+    version: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
+    optimisticConcurrency: true, // Enable optimistic locking
   }
 )
 

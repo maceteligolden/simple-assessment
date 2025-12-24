@@ -9,13 +9,14 @@ export function useUpdateExam(onSuccess?: () => void) {
   const [error, setError] = useState<string | null>(null)
 
   const updateExam = useCallback(
-    async (examId: string, examData: CreateExamDto) => {
+    async (examId: string, examData: CreateExamDto, version?: number) => {
       try {
         setIsLoading(true)
         setError(null)
 
         console.log('[Update Exam] Starting update', {
           examId,
+          version,
           payload: {
             title: examData.title,
             description: examData.description,
@@ -35,6 +36,11 @@ export function useUpdateExam(onSuccess?: () => void) {
           duration: examData.timeLimit,
           availableAnytime: examData.availableAnytime,
           randomizeQuestions: examData.randomizeQuestions,
+        }
+
+        // Include version for optimistic locking if provided
+        if (version !== undefined) {
+          updatePayload.version = version
         }
 
         // Only include dates if not availableAnytime
@@ -72,7 +78,21 @@ export function useUpdateExam(onSuccess?: () => void) {
         }
 
         return { success: true, exam: updatedExam as Exam }
-      } catch (err) {
+      } catch (err: any) {
+        // Handle optimistic lock conflicts (409 Conflict)
+        if (err?.status === 409 || err?.statusCode === 409) {
+          const errorMessage =
+            err?.message ||
+            'Exam was modified by another user. Please refresh and try again.'
+          setError(errorMessage)
+          console.error('[Update Exam] Optimistic lock conflict', err)
+          return {
+            success: false,
+            error: errorMessage,
+            isConflict: true, // Flag to indicate version conflict
+          }
+        }
+
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to update exam'
         setError(errorMessage)

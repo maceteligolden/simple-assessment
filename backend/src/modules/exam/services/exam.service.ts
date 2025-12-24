@@ -29,6 +29,8 @@ import {
   NotFoundError,
   ForbiddenError,
   InternalServerError,
+  OptimisticLockError,
+  ConflictError,
 } from '../../../shared/errors'
 import {
   IExam,
@@ -275,10 +277,16 @@ export class ExamService implements IExamService {
         randomizeQuestions: exam.randomizeQuestions,
         showResultsImmediately: exam.showResultsImmediately,
         passPercentage: exam.passPercentage,
+        version: exam.version, // Include version for optimistic locking
         questions: questions.map((q: IQuestion) => {
           // Use factory to render question (excludes sensitive data)
           const questionHandler = QuestionFactory.create(q.type)
-          return questionHandler.render(q)
+          const rendered = questionHandler.render(q)
+          // Add version for optimistic locking
+          return {
+            ...rendered,
+            version: q.version,
+          }
         }),
         participants: participants.map((p: IExamParticipant) => ({
           id: p._id.toString(),
@@ -352,25 +360,44 @@ export class ExamService implements IExamService {
         updateData.passPercentage = data.passPercentage
       }
 
-      const updatedExam = await this.examRepository.updateById(
-        exam._id.toString(),
-        updateData
-      )
+      // Get version from input if provided (for optimistic locking)
+      const expectedVersion = data.version
 
-      if (!updatedExam) {
-        throw new InternalServerError('Failed to update exam')
-      }
+      try {
+        const updatedExam = await this.examRepository.updateById(
+          exam._id.toString(),
+          updateData,
+          { expectedVersion }
+        )
 
-      logger.info('Exam updated successfully', {
-        examId: updatedExam._id.toString(),
-      })
+        if (!updatedExam) {
+          throw new InternalServerError('Failed to update exam')
+        }
 
-      return {
-        id: updatedExam._id.toString(),
-        title: updatedExam.title,
-        description: updatedExam.description,
-        duration: updatedExam.duration,
-        updatedAt: updatedExam.updatedAt.toISOString(),
+        logger.info('Exam updated successfully', {
+          examId: updatedExam._id.toString(),
+        })
+
+        return {
+          id: updatedExam._id.toString(),
+          title: updatedExam.title,
+          description: updatedExam.description,
+          duration: updatedExam.duration,
+          updatedAt: updatedExam.updatedAt.toISOString(),
+        }
+      } catch (error) {
+        // Handle optimistic lock conflicts
+        if (error instanceof OptimisticLockError) {
+          logger.warn('Optimistic lock conflict during exam update', {
+            examId: data.examId,
+            currentVersion: error.currentVersion,
+            expectedVersion: error.expectedVersion,
+          })
+          throw new ConflictError(
+            'Exam was modified by another user. Please refresh and try again.'
+          )
+        }
+        throw error
       }
     } catch (error) {
       logger.error('Error updating exam', error)

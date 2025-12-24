@@ -13,6 +13,7 @@ export interface QuestionBase {
   question: string | { text?: string; audio?: string; [key: string]: unknown } // Extensible for audio, images, etc.
   points: number
   order: number
+  version?: number // Optimistic locking version
 }
 
 // Multiple choice question
@@ -47,6 +48,7 @@ export interface Exam {
   endDate?: string // ISO date string
   randomizeQuestions: boolean
   passPercentage: number // Pass mark percentage (1-100)
+  version?: number // Optimistic locking version
   createdAt: string
   updatedAt: string
 }

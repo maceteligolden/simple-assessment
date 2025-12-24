@@ -23,12 +23,14 @@ export interface AddQuestionOutput {
   options?: string[]
   points: number
   order: number
+  version: number // Optimistic locking version
 }
 
 // Update Question
 export interface UpdateQuestionInput {
   examId: string
   questionId: string
+  version?: number // Optimistic locking version
   question?: string | Record<string, unknown>
   options?: string[]
   correctAnswer?: string | string[] | Record<string, unknown>
@@ -40,6 +42,7 @@ export interface UpdateQuestionOutput {
   question: string | Record<string, unknown>
   options?: string[]
   points: number
+  version: number // Optimistic locking version
 }
 
 // Delete Question

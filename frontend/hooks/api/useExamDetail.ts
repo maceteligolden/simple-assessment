@@ -36,7 +36,10 @@ export function useExamDetail(examId: string) {
         title: data.title,
         description: data.description,
         creatorId: data.creatorId || '', // May not be in response
-        questions: data.questions || [],
+        questions: (data.questions || []).map((q: any) => ({
+          ...q,
+          version: q.version, // Include version for optimistic locking
+        })),
         timeLimit: data.duration, // Backend uses 'duration', frontend uses 'timeLimit'
         isPublic: false, // Default value
         availableAnytime: data.availableAnytime,
@@ -44,6 +47,7 @@ export function useExamDetail(examId: string) {
         endDate: data.endDate,
         randomizeQuestions: data.randomizeQuestions,
         passPercentage: data.passPercentage || 50,
+        version: data.version, // Include version for optimistic locking
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
       }

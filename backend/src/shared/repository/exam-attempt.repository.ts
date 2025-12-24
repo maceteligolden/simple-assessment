@@ -9,10 +9,11 @@ import { Types, ClientSession } from 'mongoose'
 import { EXAM_ATTEMPT_STATUS } from '../constants'
 
 /**
- * Repository options for operations that support transactions
+ * Repository options for operations that support transactions and optimistic locking
  */
 export interface RepositoryOptions {
   session?: ClientSession
+  expectedVersion?: number // For optimistic locking - expected version of the document
 }
 
 /**

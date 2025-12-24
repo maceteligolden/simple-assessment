@@ -74,6 +74,7 @@ export interface GetExamOutput {
   randomizeQuestions: boolean
   showResultsImmediately: boolean
   passPercentage: number
+  version: number // Optimistic locking version
   questions: Array<{
     id: string
     type: string
@@ -81,6 +82,7 @@ export interface GetExamOutput {
     options?: string[]
     points: number
     order: number
+    version?: number // Optimistic locking version for questions
   }>
   participants: Array<{
     id: string
@@ -96,6 +98,7 @@ export interface GetExamOutput {
 // Update Exam
 export interface UpdateExamInput {
   examId: string
+  version?: number // Optimistic locking version
   title?: string
   description?: string
   duration?: number
