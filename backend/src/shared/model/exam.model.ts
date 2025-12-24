@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { logger } from '../util/logger'
 import { Types } from 'mongoose'
 
 export interface IExam extends Document {
@@ -111,30 +110,5 @@ const examSchema = new Schema<IExam>(
 examSchema.index({ creatorId: 1, isDeleted: 1 })
 examSchema.index({ isActive: 1, isDeleted: 1 })
 examSchema.index({ startDate: 1, endDate: 1 })
-
-// Pre-save hook for logging
-examSchema.pre('save', function (next) {
-  if (this.isNew) {
-    logger.info('Creating new exam', {
-      title: this.title,
-      creatorId: this.creatorId,
-    })
-  } else {
-    logger.info('Updating exam', {
-      examId: this._id,
-      modifiedFields: Object.keys(this.modifiedPaths()),
-    })
-  }
-  next()
-})
-
-// Post-save hook for logging
-examSchema.post('save', function (doc) {
-  logger.info('Exam saved successfully', {
-    examId: doc._id,
-    title: doc.title,
-    isActive: doc.isActive,
-  })
-})
 
 export const Exam = mongoose.model<IExam>('Exam', examSchema)

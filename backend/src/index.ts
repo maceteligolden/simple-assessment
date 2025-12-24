@@ -6,6 +6,7 @@ import {
   errorHandler,
   notFoundHandler,
   requestLogger,
+  generalRateLimiter,
 } from './shared/middleware'
 import { startServer } from './shared/util'
 import { ResponseUtil } from './shared/util'
@@ -49,6 +50,9 @@ app.use(express.json())
 
 // Request logging middleware (should be before routes)
 app.use(requestLogger)
+
+// Rate limiting middleware (applied to all routes)
+app.use(generalRateLimiter)
 
 // Swagger API Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))

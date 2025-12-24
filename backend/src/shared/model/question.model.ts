@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { logger } from '../util/logger'
 import { Types } from 'mongoose'
 
 export type QuestionType = 'multi-choice' | 'multiple-select' // Extensible for future types
@@ -67,26 +66,5 @@ const questionSchema = new Schema<IQuestion>(
 
 // Compound index for exam and order
 questionSchema.index({ examId: 1, order: 1 }, { unique: true })
-
-// Pre-save hook for logging
-questionSchema.pre('save', function (next) {
-  if (this.isNew) {
-    logger.debug('Creating new question', {
-      examId: this.examId,
-      type: this.type,
-      order: this.order,
-    })
-  }
-  next()
-})
-
-// Post-save hook for logging
-questionSchema.post('save', function (doc) {
-  logger.debug('Question saved successfully', {
-    questionId: doc._id,
-    examId: doc.examId,
-    type: doc.type,
-  })
-})
 
 export const Question = mongoose.model<IQuestion>('Question', questionSchema)

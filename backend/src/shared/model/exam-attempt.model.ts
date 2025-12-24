@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { logger } from '../util/logger'
 import { Types } from 'mongoose'
 import { EXAM_ATTEMPT_STATUS } from '../constants'
 
@@ -132,32 +131,6 @@ const examAttemptSchema = new Schema<IExamAttempt>(
 examAttemptSchema.index({ examId: 1, userId: 1 }, { unique: true })
 examAttemptSchema.index({ participantId: 1, status: 1 })
 examAttemptSchema.index({ userId: 1, status: 1 })
-
-// Pre-save hook for logging
-examAttemptSchema.pre('save', function (next) {
-  if (this.isNew) {
-    logger.info('Creating new exam attempt', {
-      examId: this.examId,
-      userId: this.userId,
-    })
-  } else {
-    logger.debug('Updating exam attempt', {
-      attemptId: this._id,
-      status: this.status,
-      modifiedFields: Object.keys(this.modifiedPaths()),
-    })
-  }
-  next()
-})
-
-// Post-save hook for logging
-examAttemptSchema.post('save', function (doc) {
-  logger.info('Exam attempt saved successfully', {
-    attemptId: doc._id,
-    examId: doc.examId,
-    status: doc.status,
-  })
-})
 
 export const ExamAttempt = mongoose.model<IExamAttempt>(
   'ExamAttempt',

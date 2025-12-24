@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { logger } from '../util/logger'
 import { UserRole, USER_ROLE_VALUES } from '../constants'
 
 export interface IUser extends Document {
@@ -61,31 +60,5 @@ const userSchema = new Schema<IUser>(
 // Unique index on email to prevent duplicate emails
 // Application logic enforces that one email cannot be used for both roles
 userSchema.index({ email: 1 }, { unique: true })
-
-// Pre-save hook for logging
-userSchema.pre('save', function (next) {
-  if (this.isNew) {
-    logger.info('Creating new user', {
-      email: this.email,
-      role: this.role,
-    })
-  } else {
-    logger.info('Updating user', {
-      email: this.email,
-      role: this.role,
-      modifiedFields: Object.keys(this.modifiedPaths()),
-    })
-  }
-  next()
-})
-
-// Post-save hook for logging
-userSchema.post('save', function (doc) {
-  logger.info('User saved successfully', {
-    userId: doc._id,
-    email: doc.email,
-    role: doc.role,
-  })
-})
 
 export const User = mongoose.model<IUser>('User', userSchema)

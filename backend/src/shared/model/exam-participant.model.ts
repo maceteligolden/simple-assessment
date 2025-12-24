@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { logger } from '../util/logger'
 import { Types } from 'mongoose'
 import crypto from 'crypto'
 
@@ -64,27 +63,6 @@ examParticipantSchema.index({ examId: 1, userId: 1 }, { unique: true })
 function generateAccessCode(): string {
   return crypto.randomBytes(6).toString('hex').toUpperCase()
 }
-
-// Pre-save hook for logging
-examParticipantSchema.pre('save', function (next) {
-  if (this.isNew) {
-    logger.info('Creating new exam participant', {
-      examId: this.examId,
-      email: this.email,
-      accessCode: this.accessCode,
-    })
-  }
-  next()
-})
-
-// Post-save hook for logging
-examParticipantSchema.post('save', function (doc) {
-  logger.info('Exam participant saved successfully', {
-    participantId: doc._id,
-    examId: doc.examId,
-    email: doc.email,
-  })
-})
 
 export const ExamParticipant = mongoose.model<IExamParticipant>(
   'ExamParticipant',

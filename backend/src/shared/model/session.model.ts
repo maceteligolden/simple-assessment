@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose'
-import { logger } from '../util/logger'
 import { Types } from 'mongoose'
 
 export interface ISession extends Document {
@@ -66,25 +65,5 @@ const sessionSchema = new Schema<ISession>(
 // Compound index for efficient queries
 sessionSchema.index({ userId: 1, isActive: 1 })
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }) // TTL index for automatic cleanup
-
-// Pre-save hook for logging
-sessionSchema.pre('save', function (next) {
-  if (this.isNew) {
-    logger.debug('Creating new session', {
-      userId: this.userId,
-      sessionToken: this.sessionToken.substring(0, 10) + '...',
-    })
-  }
-  next()
-})
-
-// Post-save hook for logging
-sessionSchema.post('save', function (doc) {
-  logger.debug('Session saved', {
-    sessionId: doc._id,
-    userId: doc.userId,
-    isActive: doc.isActive,
-  })
-})
 
 export const Session = mongoose.model<ISession>('Session', sessionSchema)

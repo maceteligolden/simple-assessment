@@ -17,7 +17,12 @@ import {
   IExamAttemptRepository,
   ExamAttemptRepository,
 } from './repository/exam-attempt.repository'
-import { ISessionService, SessionService } from './service/session.service'
+import {
+  ISessionService,
+  SessionService,
+  ICacheService,
+  CacheService,
+} from './service'
 import { AuthService } from '../modules/auth/auth.service'
 import { IAuthService } from '../modules/auth/interfaces'
 import {
@@ -73,6 +78,10 @@ export function setupContainer(): void {
   // Register services
   container.register<ISessionService>('ISessionService', {
     useClass: SessionService,
+  })
+
+  container.register<ICacheService>('ICacheService', {
+    useClass: CacheService,
   })
 
   container.register<IAuthService>('IAuthService', {

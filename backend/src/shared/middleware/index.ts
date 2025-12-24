@@ -6,6 +6,7 @@ export * from './validation.middleware'
 export * from './auth.middleware'
 export * from './authorize.middleware'
 export * from './session.middleware'
+export * from './rate-limit.middleware'
 
 // Re-export role middleware with clearer names
 export {
