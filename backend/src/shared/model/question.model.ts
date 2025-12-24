@@ -2,7 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose'
 import { logger } from '../util/logger'
 import { Types } from 'mongoose'
 
-export type QuestionType = 'multi-choice' // Extensible for future types
+export type QuestionType = 'multi-choice' | 'multiple-select' // Extensible for future types
 
 export interface IQuestion extends Document {
   examId: Types.ObjectId
@@ -26,7 +26,7 @@ const questionSchema = new Schema<IQuestion>(
     },
     type: {
       type: String,
-      enum: ['multi-choice'],
+      enum: ['multi-choice', 'multiple-select'],
       required: [true, 'Question type is required'],
     },
     question: {
@@ -37,12 +37,12 @@ const questionSchema = new Schema<IQuestion>(
       type: [String],
       validate: {
         validator: function (this: IQuestion, value: string[]) {
-          if (this.type === 'multi-choice') {
+          if (this.type === 'multi-choice' || this.type === 'multiple-select') {
             return value && value.length >= 2
           }
           return true
         },
-        message: 'Multi-choice questions must have at least 2 options',
+        message: 'Multi-choice and multiple-select questions must have at least 2 options',
       },
     },
     correctAnswer: {

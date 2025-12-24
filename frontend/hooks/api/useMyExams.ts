@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAppStore, type RootState } from '@/store/store'
-import { ENV } from '@/constants'
+import { ENV, EXAM_ATTEMPT_STATUS } from '@/constants'
 import { Exam } from '@/interfaces'
 
 interface MyExam {
@@ -12,7 +12,7 @@ interface MyExam {
   questionCount: number
   accessCode: string
   addedAt: string
-  attemptStatus?: 'not_started' | 'in-progress' | 'completed' | 'submitted' | 'abandoned'
+  attemptStatus?: typeof EXAM_ATTEMPT_STATUS[keyof typeof EXAM_ATTEMPT_STATUS]
   attemptId?: string
   score?: number
   maxScore?: number
@@ -122,13 +122,14 @@ export function useMyExams(
   // Backend returns 'submitted' for completed exams, but interface uses 'completed'
   const takenExams = exams.filter(
     (exam) => 
-      exam.attemptStatus === 'completed' || 
-      exam.attemptStatus === 'submitted' ||
+      exam.attemptStatus === EXAM_ATTEMPT_STATUS.COMPLETED ||
+      exam.attemptStatus === EXAM_ATTEMPT_STATUS.SUBMITTED ||
       (exam.attemptStatus === undefined && exam.score !== undefined) // Fallback: if has score, it's taken
   )
   const availableExams = exams.filter(
     (exam) => 
-      (exam.attemptStatus === 'not_started' || exam.attemptStatus === undefined) && 
+      (exam.attemptStatus === EXAM_ATTEMPT_STATUS.NOT_STARTED ||
+        exam.attemptStatus === undefined) && 
       exam.isAvailable
   )
 

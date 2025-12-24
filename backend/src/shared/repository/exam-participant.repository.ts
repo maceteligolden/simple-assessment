@@ -5,6 +5,7 @@ import {
 } from '../model/exam-participant.model'
 import { logger } from '../util/logger'
 import { Types } from 'mongoose'
+import { EXAM_ATTEMPT_STATUS } from '../constants'
 
 /**
  * Exam Participant Repository Interface
@@ -192,7 +193,7 @@ export class ExamParticipantRepository implements IExamParticipantRepository {
       const { ExamAttempt } = await import('../model/exam-attempt.model')
       const count = await ExamAttempt.countDocuments({
         participantId: new Types.ObjectId(participantId),
-        status: { $ne: 'not-started' },
+        status: { $ne: EXAM_ATTEMPT_STATUS.NOT_STARTED },
       })
       return count > 0
     } catch (error) {

@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose'
 import { logger } from '../util/logger'
 import { Types } from 'mongoose'
+import { EXAM_ATTEMPT_STATUS } from '../constants'
 
 export type AttemptStatus =
   | 'not-started'
@@ -68,8 +69,14 @@ const examAttemptSchema = new Schema<IExamAttempt>(
     },
     status: {
       type: String,
-      enum: ['not-started', 'in-progress', 'abandoned', 'submitted', 'expired'],
-      default: 'not-started',
+      enum: [
+        EXAM_ATTEMPT_STATUS.NOT_STARTED,
+        EXAM_ATTEMPT_STATUS.IN_PROGRESS,
+        EXAM_ATTEMPT_STATUS.ABANDONED,
+        EXAM_ATTEMPT_STATUS.SUBMITTED,
+        EXAM_ATTEMPT_STATUS.EXPIRED,
+      ],
+      default: EXAM_ATTEMPT_STATUS.NOT_STARTED,
       index: true,
     },
     startedAt: {

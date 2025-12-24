@@ -39,7 +39,9 @@ export interface ParticipantExam {
  */
 const getStatusBadge = (status?: string): ReactNode => {
   const statusValue =
-    status === 'not_started' || !status ? 'not_started' : status
+    status === EXAM_ATTEMPT_STATUS.NOT_STARTED || !status
+      ? EXAM_ATTEMPT_STATUS.NOT_STARTED
+      : status
 
   const statusConfig: Record<string, { label: string; className: string }> = {
     not_started: {
@@ -47,7 +49,7 @@ const getStatusBadge = (status?: string): ReactNode => {
       className:
         'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
     },
-    'in-progress': {
+    [EXAM_ATTEMPT_STATUS.IN_PROGRESS]: {
       label: 'In Progress',
       className:
         'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
@@ -68,7 +70,8 @@ const getStatusBadge = (status?: string): ReactNode => {
     },
   }
 
-  const config = statusConfig[statusValue] || statusConfig.not_started
+  const config =
+    statusConfig[statusValue] || statusConfig[EXAM_ATTEMPT_STATUS.NOT_STARTED]
 
   return (
     <span
@@ -240,8 +243,9 @@ export const getParticipantExamColumns = (): ColumnDef<ParticipantExam>[] => [
     align: 'right',
     accessor: row => {
       const status =
-        row.attemptStatus === 'not_started' || !row.attemptStatus
-          ? 'not_started'
+        row.attemptStatus === EXAM_ATTEMPT_STATUS.NOT_STARTED ||
+        !row.attemptStatus
+          ? EXAM_ATTEMPT_STATUS.NOT_STARTED
           : row.attemptStatus
 
       if (status === EXAM_ATTEMPT_STATUS.NOT_STARTED) {

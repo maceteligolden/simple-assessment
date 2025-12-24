@@ -26,7 +26,7 @@ interface Question {
   type: QuestionType
   question: string
   options: string[]
-  correctAnswer: string
+  correctAnswer: string | string[] // string for multiple-choice, string[] for multiple-select
 }
 
 export default function CreateExamForm({
@@ -86,7 +86,7 @@ export default function CreateExamForm({
     }
   }, [initialData])
 
-  // Available question types (only multiple-choice for now, but UI shows others are considered)
+  // Available question types
   const availableQuestionTypes: Array<{
     type: QuestionType
     label: string
@@ -97,6 +97,12 @@ export default function CreateExamForm({
       type: 'multiple-choice',
       label: 'Multiple Choice',
       description: 'Select one correct answer from multiple options',
+      available: true,
+    },
+    {
+      type: 'multiple-select',
+      label: 'Multiple Select',
+      description: 'Select multiple correct answers (at least 2)',
       available: true,
     },
     {
@@ -132,8 +138,12 @@ export default function CreateExamForm({
         id: Date.now().toString(),
         type: questionType,
         question: '',
-        options: questionType === 'multiple-choice' ? ['', ''] : [],
-        correctAnswer: '',
+        options:
+          questionType === 'multiple-choice' || questionType === 'multiple-select'
+            ? ['', '']
+            : [],
+        correctAnswer:
+          questionType === 'multiple-select' ? [] : '',
       },
     ])
     setShowQuestionTypeSelector(false)
@@ -264,19 +274,50 @@ export default function CreateExamForm({
       if (q.options.some(opt => !opt.trim())) {
         newErrors[`options-${q.id}`] = `Question ${index + 1} has empty options`
       }
-      if (!q.correctAnswer) {
-        newErrors[`answer-${q.id}`] =
-          `Question ${index + 1} needs a correct answer`
-      } else {
-        // Validate that correct answer is a valid option index
-        const answerIndex = parseInt(q.correctAnswer, 10)
+      if (q.type === 'multiple-choice') {
+        if (!q.correctAnswer || typeof q.correctAnswer !== 'string') {
+          newErrors[`answer-${q.id}`] =
+            `Question ${index + 1} needs a correct answer`
+        } else {
+          // Validate that correct answer is a valid option index
+          const answerIndex = parseInt(q.correctAnswer, 10)
+          if (
+            isNaN(answerIndex) ||
+            answerIndex < 0 ||
+            answerIndex >= q.options.length
+          ) {
+            newErrors[`answer-${q.id}`] =
+              `Question ${index + 1} correct answer must be one of the provided options`
+          }
+        }
+      } else if (q.type === 'multiple-select') {
         if (
-          isNaN(answerIndex) ||
-          answerIndex < 0 ||
-          answerIndex >= q.options.length
+          !q.correctAnswer ||
+          !Array.isArray(q.correctAnswer) ||
+          q.correctAnswer.length < 2
         ) {
           newErrors[`answer-${q.id}`] =
-            `Question ${index + 1} correct answer must be one of the provided options`
+            `Question ${index + 1} needs at least 2 correct answers`
+        } else {
+          // Validate that all correct answers are valid option indices
+          const invalidAnswers = q.correctAnswer.filter(ans => {
+            const answerIndex = parseInt(String(ans), 10)
+            return (
+              isNaN(answerIndex) ||
+              answerIndex < 0 ||
+              answerIndex >= q.options.length
+            )
+          })
+          if (invalidAnswers.length > 0) {
+            newErrors[`answer-${q.id}`] =
+              `Question ${index + 1} has invalid correct answer indices`
+          }
+          // Check for duplicates
+          const uniqueAnswers = new Set(q.correctAnswer.map(String))
+          if (uniqueAnswers.size !== q.correctAnswer.length) {
+            newErrors[`answer-${q.id}`] =
+              `Question ${index + 1} has duplicate correct answers`
+          }
         }
       }
     })
@@ -544,7 +585,9 @@ export default function CreateExamForm({
                     <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
                       {question.type === 'multiple-choice'
                         ? 'Multiple Choice'
-                        : question.type}
+                        : question.type === 'multiple-select'
+                          ? 'Multiple Select'
+                          : question.type}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -612,68 +655,126 @@ export default function CreateExamForm({
                       Options <span className="text-red-500">*</span>
                     </label>
                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                      Click the radio button to mark the correct answer
+                      {question.type === 'multiple-choice'
+                        ? 'Click the radio button to mark the correct answer'
+                        : question.type === 'multiple-select'
+                          ? 'Select at least 2 correct answers (checkboxes)'
+                          : 'Mark the correct answer'}
                     </span>
                   </div>
                   <div className="space-y-2">
-                    {question.options.map((option, optIndex) => (
-                      <div
-                        key={optIndex}
-                        className={`flex gap-3 items-center p-2 rounded-lg border-2 transition-colors ${
-                          question.correctAnswer === optIndex.toString()
-                            ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                            : 'border-gray-200 dark:border-gray-700'
-                        }`}
-                      >
-                        <label className="flex items-center gap-2 cursor-pointer flex-1">
-                          <input
-                            type="radio"
-                            name={`correct-${question.id}`}
-                            checked={
-                              question.correctAnswer === optIndex.toString()
-                            }
-                            onChange={() =>
-                              updateQuestion(
-                                question.id,
-                                'correctAnswer',
-                                optIndex.toString()
-                              )
-                            }
-                            className="h-5 w-5 text-green-600 focus:ring-green-500"
-                          />
-                          <span
-                            className={`text-sm font-medium ${
-                              question.correctAnswer === optIndex.toString()
-                                ? 'text-green-700 dark:text-green-300'
-                                : 'text-gray-600 dark:text-gray-400'
-                            }`}
-                          >
-                            {question.correctAnswer === optIndex.toString()
-                              ? 'Correct Answer'
-                              : 'Mark as Correct'}
-                          </span>
-                        </label>
-                        <Input
-                          value={option}
-                          onChange={e =>
-                            updateOption(question.id, optIndex, e.target.value)
+                    {question.options.map((option, optIndex) => {
+                      const optIndexStr = optIndex.toString()
+                      const isCorrect =
+                        question.type === 'multiple-choice'
+                          ? question.correctAnswer === optIndexStr
+                          : question.type === 'multiple-select'
+                            ? Array.isArray(question.correctAnswer) &&
+                              question.correctAnswer.includes(optIndexStr)
+                            : false
+
+                      const handleCorrectAnswerToggle = () => {
+                        if (question.type === 'multiple-choice') {
+                          updateQuestion(
+                            question.id,
+                            'correctAnswer',
+                            optIndexStr
+                          )
+                        } else if (question.type === 'multiple-select') {
+                          const currentAnswers = Array.isArray(
+                            question.correctAnswer
+                          )
+                            ? question.correctAnswer
+                            : []
+                          if (isCorrect) {
+                            // Remove from correct answers
+                            updateQuestion(
+                              question.id,
+                              'correctAnswer',
+                              currentAnswers.filter(ans => ans !== optIndexStr)
+                            )
+                          } else {
+                            // Add to correct answers
+                            updateQuestion(question.id, 'correctAnswer', [
+                              ...currentAnswers,
+                              optIndexStr,
+                            ])
                           }
-                          placeholder={`Option ${optIndex + 1}`}
-                          className="flex-1"
-                          onClick={e => e.stopPropagation()}
-                        />
-                        {question.options.length > 2 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeOption(question.id, optIndex)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                        }
+                      }
+
+                      return (
+                        <div
+                          key={optIndex}
+                          className={`flex gap-3 items-center p-2 rounded-lg border-2 transition-colors ${
+                            isCorrect
+                              ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                              : 'border-gray-200 dark:border-gray-700'
+                          }`}
+                        >
+                          <label className="flex items-center gap-2 cursor-pointer flex-1">
+                            {question.type === 'multiple-choice' ? (
+                              <input
+                                type="radio"
+                                name={`correct-${question.id}`}
+                                checked={isCorrect}
+                                onChange={handleCorrectAnswerToggle}
+                                className="h-5 w-5 text-green-600 focus:ring-green-500"
+                              />
+                            ) : question.type === 'multiple-select' ? (
+                              <input
+                                type="checkbox"
+                                checked={isCorrect}
+                                onChange={handleCorrectAnswerToggle}
+                                className="h-5 w-5 text-green-600 focus:ring-green-500 rounded"
+                              />
+                            ) : null}
+                            <span
+                              className={`text-sm font-medium ${
+                                isCorrect
+                                  ? 'text-green-700 dark:text-green-300'
+                                  : 'text-gray-600 dark:text-gray-400'
+                              }`}
+                            >
+                              {isCorrect
+                                ? 'Correct Answer'
+                                : 'Mark as Correct'}
+                            </span>
+                            {question.type === 'multiple-select' &&
+                              isCorrect && (
+                                <span className="text-xs text-green-600 dark:text-green-400">
+                                  (
+                                  {Array.isArray(question.correctAnswer)
+                                    ? question.correctAnswer.length
+                                    : 0}{' '}
+                                  selected)
+                                </span>
+                              )}
+                          </label>
+                          <Input
+                            value={option}
+                            onChange={e =>
+                              updateOption(question.id, optIndex, e.target.value)
+                            }
+                            placeholder={`Option ${optIndex + 1}`}
+                            className="flex-1"
+                            onClick={e => e.stopPropagation()}
+                          />
+                          {question.options.length > 2 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                removeOption(question.id, optIndex)
+                              }
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      )
+                    })}
                     <Button
                       type="button"
                       variant="outline"

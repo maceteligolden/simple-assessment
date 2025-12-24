@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe'
 import { Request, Response, NextFunction } from 'express'
 import { ResponseUtil, parsePaginationParams } from '../../../shared/util'
-import { HTTP_STATUS } from '../../../shared/constants'
+import { HTTP_STATUS, PARTICIPANT_ATTEMPT_STATUS } from '../../../shared/constants'
 import { logger } from '../../../shared/util/logger'
 import {
   IExamParticipantService,
@@ -139,10 +139,7 @@ export class ExamParticipantController implements IExamParticipantController {
         pagination: paginationParams,
         search: req.query.search as string | undefined,
         status: req.query.status as
-          | 'not_started'
-          | 'in-progress'
-          | 'completed'
-          | 'abandoned'
+          | (typeof PARTICIPANT_ATTEMPT_STATUS)[keyof typeof PARTICIPANT_ATTEMPT_STATUS]
           | undefined,
         isAvailable:
           req.query.isAvailable !== undefined
@@ -181,7 +178,7 @@ export class ExamParticipantController implements IExamParticipantController {
       const input: GetMyExamsInput = {
         pagination: paginationParams,
         search: req.query.search as string | undefined,
-        status: 'not_started', // Always filter for not_started
+        status: PARTICIPANT_ATTEMPT_STATUS.NOT_STARTED, // Always filter for not_started
         isAvailable:
           req.query.isAvailable !== undefined
             ? req.query.isAvailable === 'true'

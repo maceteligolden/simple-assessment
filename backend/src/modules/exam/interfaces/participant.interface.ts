@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import { PaginationInput } from '../../../shared/interfaces/pagination.interface'
+import { PARTICIPANT_ATTEMPT_STATUS } from '../../../shared/constants'
 
 /**
  * Participant Interfaces
@@ -43,7 +44,7 @@ export interface ListParticipantsOutput {
     accessCode: string
     isUsed: boolean
     addedAt: string
-    attemptStatus?: 'not_started' | 'in-progress' | 'completed' | 'abandoned'
+    attemptStatus?: typeof PARTICIPANT_ATTEMPT_STATUS[keyof typeof PARTICIPANT_ATTEMPT_STATUS]
     score?: number
     maxScore?: number
     percentage?: number
@@ -95,7 +96,7 @@ export interface GetParticipantResultOutput {
 
 // Get My Exams (for participant)
 export interface GetMyExamsInput extends PaginationInput {
-  status?: 'not_started' | 'in-progress' | 'completed' | 'abandoned'
+  status?: typeof PARTICIPANT_ATTEMPT_STATUS[keyof typeof PARTICIPANT_ATTEMPT_STATUS]
   search?: string
   isAvailable?: boolean
 }
@@ -110,7 +111,7 @@ export interface GetMyExamsOutput {
     questionCount: number
     accessCode: string
     addedAt: string
-    attemptStatus?: 'not_started' | 'in-progress' | 'completed' | 'abandoned'
+    attemptStatus?: typeof PARTICIPANT_ATTEMPT_STATUS[keyof typeof PARTICIPANT_ATTEMPT_STATUS]
     attemptId?: string
     score?: number
     maxScore?: number

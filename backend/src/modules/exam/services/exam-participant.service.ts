@@ -14,6 +14,7 @@ import {
 } from '../../../shared/util'
 import {
   EXAM_ATTEMPT_STATUS,
+  PARTICIPANT_ATTEMPT_STATUS,
   mapAttemptStatusToParticipantStatus,
   type ExamAttemptStatus,
 } from '../../../shared/constants'
@@ -258,11 +259,8 @@ export class ExamParticipantService implements IExamParticipantService {
             participant._id.toString()
           )
 
-          let attemptStatus:
-            | 'not_started'
-            | 'in-progress'
-            | 'completed'
-            | 'abandoned' = 'not_started'
+          let attemptStatus: (typeof PARTICIPANT_ATTEMPT_STATUS)[keyof typeof PARTICIPANT_ATTEMPT_STATUS] =
+            PARTICIPANT_ATTEMPT_STATUS.NOT_STARTED
           let score: number | undefined
           let maxScore: number | undefined
           let percentage: number | undefined
@@ -511,11 +509,8 @@ export class ExamParticipantService implements IExamParticipantService {
             participant._id.toString()
           )
 
-          let attemptStatus:
-            | 'not_started'
-            | 'in-progress'
-            | 'completed'
-            | 'abandoned' = 'not_started'
+          let attemptStatus: (typeof PARTICIPANT_ATTEMPT_STATUS)[keyof typeof PARTICIPANT_ATTEMPT_STATUS] =
+            PARTICIPANT_ATTEMPT_STATUS.NOT_STARTED
           let attemptId: string | undefined
           let score: number | undefined
           let maxScore: number | undefined
@@ -525,20 +520,14 @@ export class ExamParticipantService implements IExamParticipantService {
 
           if (attempt) {
             attemptId = attempt._id.toString()
-            // Map attempt.status to attemptStatus
-            // Backend uses 'submitted' but frontend expects 'completed'
-            if (attempt.status === 'submitted') {
-              attemptStatus = 'completed'
+            // Map attempt.status to attemptStatus using the mapping function
+            attemptStatus = mapAttemptStatusToParticipantStatus(
+              attempt.status as ExamAttemptStatus
+            )
+            if (attempt.status === EXAM_ATTEMPT_STATUS.SUBMITTED) {
               score = attempt.score
               maxScore = attempt.maxScore
               percentage = attempt.percentage
-            } else if (attempt.status === 'in-progress') {
-              attemptStatus = 'in-progress'
-            } else if (attempt.status === 'abandoned') {
-              attemptStatus = 'abandoned'
-            } else {
-              // Default to 'not_started' for any other status
-              attemptStatus = 'not_started'
             }
 
             if (attempt.startedAt) {

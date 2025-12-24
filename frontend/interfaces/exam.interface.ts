@@ -1,5 +1,6 @@
 export type QuestionType =
   | 'multiple-choice'
+  | 'multiple-select'
   | 'fill-in-the-blank'
   | 'audio-response'
   | 'short-answer'
@@ -21,8 +22,15 @@ export interface MultipleChoiceQuestion extends QuestionBase {
   correctAnswer: string // Index of correct option
 }
 
+// Multiple select question
+export interface MultipleSelectQuestion extends QuestionBase {
+  type: 'multiple-select'
+  options: string[]
+  correctAnswer: string[] // Array of indices of correct options (at least 2)
+}
+
 // Union type for all question types
-export type Question = MultipleChoiceQuestion // Add other types as needed
+export type Question = MultipleChoiceQuestion | MultipleSelectQuestion // Add other types as needed
 
 export interface Exam {
   id: string

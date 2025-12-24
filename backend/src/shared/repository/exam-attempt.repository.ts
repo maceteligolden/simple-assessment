@@ -6,6 +6,7 @@ import {
 } from '../model/exam-attempt.model'
 import { logger } from '../util/logger'
 import { Types } from 'mongoose'
+import { EXAM_ATTEMPT_STATUS } from '../constants'
 
 /**
  * Exam Attempt Repository Interface
@@ -58,7 +59,7 @@ export class ExamAttemptRepository implements IExamAttemptRepository {
         examId: new Types.ObjectId(data.examId),
         participantId: new Types.ObjectId(data.participantId),
         userId: new Types.ObjectId(data.userId),
-        status: 'not-started',
+        status: EXAM_ATTEMPT_STATUS.NOT_STARTED,
       })
       await attempt.save()
       logger.debug('Exam attempt created successfully', {
@@ -195,7 +196,7 @@ export class ExamAttemptRepository implements IExamAttemptRepository {
       const result = await ExamAttempt.findByIdAndUpdate(
         id,
         {
-          status: 'abandoned',
+          status: EXAM_ATTEMPT_STATUS.ABANDONED,
           abandonedAt: new Date(),
         },
         { new: true }

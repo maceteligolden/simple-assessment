@@ -48,14 +48,22 @@ export default function TakeExamPage() {
     if (result.success && result.data) {
       // Map backend question type to frontend type and ensure proper structure
       const backendQuestion = result.data.question
+      const questionType =
+        backendQuestion.type === 'multi-choice'
+          ? 'multiple-choice'
+          : backendQuestion.type === 'multiple-select'
+            ? 'multiple-select'
+            : backendQuestion.type
+
       const mappedQuestion: Question = {
         id: backendQuestion.id,
-        type: 'multiple-choice',
+        type: questionType as 'multiple-choice' | 'multiple-select',
         question: backendQuestion.question,
         options: backendQuestion.options || [],
         points: backendQuestion.points,
         order: backendQuestion.order,
-        correctAnswer: '', // Not provided by backend for security
+        correctAnswer:
+          questionType === 'multiple-select' ? [] : '', // Not provided by backend for security
       }
 
       // Debug logging

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAppStore, type RootState } from '@/store/store'
-import { ENV } from '@/constants'
+import { ENV, EXAM_ATTEMPT_STATUS } from '@/constants'
 import { Exam } from '@/interfaces'
 
 interface NotStartedExam {
@@ -12,7 +12,7 @@ interface NotStartedExam {
   questionCount: number
   accessCode: string
   addedAt: string
-  attemptStatus?: 'not_started'
+  attemptStatus?: typeof EXAM_ATTEMPT_STATUS.NOT_STARTED
   isAvailable: boolean
 }
 

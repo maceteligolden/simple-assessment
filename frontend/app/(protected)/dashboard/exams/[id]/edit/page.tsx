@@ -64,17 +64,33 @@ export default function EditExamPage() {
               ? q.question
               : (q.question as any)?.text || ''
 
-          // Map backend type 'multi-choice' to frontend type 'multiple-choice'
+          // Map backend types to frontend types
           const questionType =
-            (q.type as string) === 'multi-choice' ? 'multiple-choice' : q.type
+            (q.type as string) === 'multi-choice'
+              ? 'multiple-choice'
+              : (q.type as string) === 'multiple-select'
+                ? 'multiple-select'
+                : q.type
+
+          // Handle correctAnswer based on question type
+          let correctAnswer: string | string[]
+          if (questionType === 'multiple-select') {
+            // For multiple-select, keep as array
+            correctAnswer = Array.isArray(q.correctAnswer)
+              ? q.correctAnswer.map(String)
+              : []
+          } else {
+            // For multiple-choice, use string
+            correctAnswer = Array.isArray(q.correctAnswer)
+              ? q.correctAnswer[0] || '0'
+              : String(q.correctAnswer || '0')
+          }
 
           return {
-            type: questionType as 'multiple-choice', // Map backend type to frontend type
+            type: questionType as 'multiple-choice' | 'multiple-select',
             question: questionText,
             options: q.options || [],
-            correctAnswer: Array.isArray(q.correctAnswer)
-              ? q.correctAnswer[0] || '0' // For multi-choice, use first item if array
-              : String(q.correctAnswer || '0'),
+            correctAnswer,
             points: q.points || 1,
           }
         }),

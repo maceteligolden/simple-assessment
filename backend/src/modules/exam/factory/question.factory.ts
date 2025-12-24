@@ -1,5 +1,6 @@
 import { IQuestion, QuestionType } from '../../../shared/model'
 import { MultiChoiceQuestion } from './questions/multi-choice.question'
+import { MultipleSelectQuestion } from './questions/multiple-select.question'
 
 /**
  * Question Creation Input
@@ -148,3 +149,4 @@ export class QuestionFactory {
 
 // Register default question types
 QuestionFactory.register('multi-choice', MultiChoiceQuestion)
+QuestionFactory.register('multiple-select', MultipleSelectQuestion)

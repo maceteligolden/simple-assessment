@@ -92,36 +92,57 @@ export default function ExamPreview({
                 </p>
               </div>
 
-              {question.type === 'multiple-choice' && (
+              {(question.type === 'multiple-choice' ||
+                question.type === 'multiple-select') && (
                 <div className="ml-6 space-y-2">
-                  {question.options.map((option, optIndex) => (
-                    <div
-                      key={optIndex}
-                      className={`flex items-center gap-2 p-2 rounded ${
-                        question.correctAnswer === optIndex.toString()
-                          ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                          : 'bg-gray-50 dark:bg-gray-800'
-                      }`}
-                    >
-                      {question.correctAnswer === optIndex.toString() && (
-                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                      )}
-                      <span
-                        className={
-                          question.correctAnswer === optIndex.toString()
-                            ? 'font-medium text-green-700 dark:text-green-300'
-                            : ''
-                        }
+                  {question.options.map((option, optIndex) => {
+                    const optIndexStr = optIndex.toString()
+                    const isCorrect =
+                      question.type === 'multiple-choice'
+                        ? question.correctAnswer === optIndexStr
+                        : question.type === 'multiple-select'
+                          ? Array.isArray(question.correctAnswer) &&
+                            question.correctAnswer.includes(optIndexStr)
+                          : false
+
+                    return (
+                      <div
+                        key={optIndex}
+                        className={`flex items-center gap-2 p-2 rounded ${
+                          isCorrect
+                            ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                            : 'bg-gray-50 dark:bg-gray-800'
+                        }`}
                       >
-                        {String.fromCharCode(65 + optIndex)}. {option}
-                      </span>
-                      {question.correctAnswer === optIndex.toString() && (
-                        <span className="ml-auto text-xs text-green-600 dark:text-green-400">
-                          Correct Answer
+                        {isCorrect && (
+                          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        )}
+                        <span
+                          className={
+                            isCorrect
+                              ? 'font-medium text-green-700 dark:text-green-300'
+                              : ''
+                          }
+                        >
+                          {String.fromCharCode(65 + optIndex)}. {option}
                         </span>
-                      )}
+                        {isCorrect && (
+                          <span className="ml-auto text-xs text-green-600 dark:text-green-400">
+                            Correct Answer
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {question.type === 'multiple-select' && (
+                    <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+                      Multiple Select: Select all correct answers (
+                      {Array.isArray(question.correctAnswer)
+                        ? question.correctAnswer.length
+                        : 0}{' '}
+                      correct)
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
 

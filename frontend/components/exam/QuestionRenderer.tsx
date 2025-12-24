@@ -2,6 +2,7 @@
 
 import { Question } from '@/interfaces'
 import { MultipleChoiceQuestionRenderer } from './question-types/MultipleChoiceQuestion'
+import { MultipleSelectQuestionRenderer } from './question-types/MultipleSelectQuestion'
 
 interface QuestionRendererProps {
   question: Question
@@ -17,12 +18,22 @@ export function QuestionRenderer({
   questionNumber,
 }: QuestionRendererProps) {
   // Render based on question type
-  // Currently only multiple-choice is supported
   if (question.type === 'multiple-choice') {
     return (
       <MultipleChoiceQuestionRenderer
         question={question}
         answer={answer as string | undefined}
+        onAnswerChange={ans => onAnswerChange(ans)}
+        questionNumber={questionNumber}
+      />
+    )
+  }
+
+  if (question.type === 'multiple-select') {
+    return (
+      <MultipleSelectQuestionRenderer
+        question={question}
+        answer={answer as string[] | undefined}
         onAnswerChange={ans => onAnswerChange(ans)}
         questionNumber={questionNumber}
       />

@@ -8,8 +8,8 @@ import { z } from 'zod'
 export const addQuestionSchema = z
   .object({
     body: z.object({
-      type: z.literal('multi-choice', {
-        message: 'Question type must be "multi-choice"',
+      type: z.enum(['multi-choice', 'multiple-select'], {
+        message: 'Question type must be "multi-choice" or "multiple-select"',
       }),
       question: z.union([z.string(), z.record(z.string(), z.any())], {
         message: 'Question text is required',
@@ -32,11 +32,11 @@ export const addQuestionSchema = z
   })
   .refine(
     data => {
+      const options = data.body.options || []
+      const correctAnswer = data.body.correctAnswer
+
       // For multi-choice questions, validate that correctAnswer is a valid option index
       if (data.body.type === 'multi-choice') {
-        const options = data.body.options || []
-        const correctAnswer = data.body.correctAnswer
-
         // If correctAnswer is a string, check if it's a valid index
         if (typeof correctAnswer === 'string') {
           const index = parseInt(correctAnswer, 10)
@@ -53,11 +53,55 @@ export const addQuestionSchema = z
           return false
         }
       }
+      // For multiple-select questions, validate that correctAnswer is an array of valid indices
+      else if (data.body.type === 'multiple-select') {
+        // Must be an array
+        if (!Array.isArray(correctAnswer)) {
+          return false
+        }
+
+        // Must have at least 2 correct answers
+        if (correctAnswer.length < 2) {
+          return false
+        }
+
+        // Each item must be a valid index
+        for (const ans of correctAnswer) {
+          if (typeof ans !== 'string') {
+            return false
+          }
+          const index = parseInt(ans, 10)
+          if (
+            isNaN(index) ||
+            index < 0 ||
+            index >= options.length ||
+            index.toString() !== ans.trim() ||
+            !/^\d+$/.test(ans.trim())
+          ) {
+            return false
+          }
+        }
+
+        // Check for duplicates
+        const uniqueIndices = new Set(
+          correctAnswer.map(ans => parseInt(String(ans).trim(), 10))
+        )
+        if (uniqueIndices.size !== correctAnswer.length) {
+          return false
+        }
+      }
       return true
     },
     {
-      message:
-        'Correct answer must be a valid option index (0 to number of options - 1)',
+      message: (data) => {
+        if (data.body.type === 'multi-choice') {
+          return 'Correct answer must be a valid option index (0 to number of options - 1)'
+        }
+        if (data.body.type === 'multiple-select') {
+          return 'Correct answer must be an array of at least 2 valid option indices (0 to number of options - 1) with no duplicates'
+        }
+        return 'Invalid correct answer format'
+      },
       path: ['body', 'correctAnswer'],
     }
   )

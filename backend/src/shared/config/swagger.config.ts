@@ -366,7 +366,7 @@ const options: swaggerJsdoc.Options = {
           properties: {
             type: {
               type: 'string',
-              enum: ['multi-choice'],
+              enum: ['multi-choice', 'multiple-select'],
               example: 'multi-choice',
             },
             question: {
@@ -456,7 +456,7 @@ const options: swaggerJsdoc.Options = {
             },
             type: {
               type: 'string',
-              enum: ['multi-choice'],
+              enum: ['multi-choice', 'multiple-select'],
               example: 'multi-choice',
             },
             question: {

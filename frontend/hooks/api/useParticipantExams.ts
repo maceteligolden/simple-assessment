@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore, type RootState } from '@/store/store'
-import { ENV } from '@/constants'
+import { ENV, EXAM_ATTEMPT_STATUS } from '@/constants'
 
 interface ParticipantExam {
   examId: string
@@ -11,12 +11,7 @@ interface ParticipantExam {
   questionCount: number
   accessCode: string
   addedAt: string
-  attemptStatus?:
-    | 'not_started'
-    | 'in-progress'
-    | 'completed'
-    | 'submitted'
-    | 'abandoned'
+  attemptStatus?: typeof EXAM_ATTEMPT_STATUS[keyof typeof EXAM_ATTEMPT_STATUS]
   attemptId?: string
   score?: number
   maxScore?: number

@@ -245,7 +245,7 @@ export class ExamAttemptService implements IExamAttemptService {
       }
 
       // Check if attempt is active
-      if (attempt.status !== 'in-progress') {
+      if (attempt.status !== EXAM_ATTEMPT_STATUS.IN_PROGRESS) {
         throw new BadRequestError(
           `Cannot fetch questions. Exam attempt status: ${attempt.status}`
         )
@@ -366,7 +366,7 @@ export class ExamAttemptService implements IExamAttemptService {
       }
 
       // Check if attempt is active
-      if (attempt.status !== 'in-progress') {
+      if (attempt.status !== EXAM_ATTEMPT_STATUS.IN_PROGRESS) {
         throw new BadRequestError(
           `Cannot submit answers. Exam attempt status: ${attempt.status}`
         )
@@ -479,7 +479,7 @@ export class ExamAttemptService implements IExamAttemptService {
         throw new BadRequestError('Exam has already been submitted')
       }
 
-      if (attempt.status !== 'in-progress') {
+      if (attempt.status !== EXAM_ATTEMPT_STATUS.IN_PROGRESS) {
         throw new BadRequestError(
           `Cannot submit exam. Status: ${attempt.status}`
         )
@@ -840,7 +840,7 @@ export class ExamAttemptService implements IExamAttemptService {
   private async autoSubmitExam(attemptId: string): Promise<void> {
     try {
       const attempt = await this.attemptRepository.findById(attemptId)
-      if (!attempt || attempt.status !== 'in-progress') {
+      if (!attempt || attempt.status !== EXAM_ATTEMPT_STATUS.IN_PROGRESS) {
         return
       }
 
@@ -858,7 +858,7 @@ export class ExamAttemptService implements IExamAttemptService {
       const markingResult = await this.markExam(attempt, questions)
 
       await this.attemptRepository.updateById(attemptId, {
-        status: 'expired',
+        status: EXAM_ATTEMPT_STATUS.EXPIRED,
         submittedAt: new Date(),
         score: markingResult.score,
         maxScore: markingResult.maxScore,

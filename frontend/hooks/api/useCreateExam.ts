@@ -214,8 +214,13 @@ export function useCreateExam(onSuccess?: () => void) {
         // Questions must be added one at a time so the backend can correctly calculate order
         for (let i = 0; i < examData.questions.length; i++) {
           const question = examData.questions[i]
-          // Map frontend type 'multiple-choice' to backend type 'multi-choice'
-          const backendType = question.type === 'multiple-choice' ? 'multi-choice' : question.type
+          // Map frontend types to backend types
+          const backendType =
+            question.type === 'multiple-choice'
+              ? 'multi-choice'
+              : question.type === 'multiple-select'
+                ? 'multiple-select'
+                : question.type
           
           const questionPayload = {
             type: backendType,
