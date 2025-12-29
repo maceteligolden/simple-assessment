@@ -129,7 +129,8 @@ export default function AttemptResultsPage() {
                 <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                   <Clock className="h-4 w-4" />
                   <span>
-                    Submitted on {new Date(results.submittedAt).toLocaleString()}
+                    Submitted on{' '}
+                    {new Date(results.submittedAt).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -142,7 +143,8 @@ export default function AttemptResultsPage() {
                         : 'text-red-600 dark:text-red-400 font-medium'
                     }
                   >
-                    {percentage.toFixed(1)}% {passed ? '≥' : '<'} {passPercentage}%
+                    {percentage.toFixed(1)}% {passed ? '≥' : '<'}{' '}
+                    {passPercentage}%
                   </span>
                 </div>
               </div>

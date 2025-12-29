@@ -10,7 +10,7 @@ let globalToasts: Toast[] = []
 let listeners: Array<() => void> = []
 
 const notify = () => {
-  listeners.forEach((listener) => listener())
+  listeners.forEach(listener => listener())
 }
 
 export function useToast() {
@@ -25,7 +25,7 @@ export function useToast() {
     // Initialize with current toasts
     setToasts([...globalToasts])
     return () => {
-      listeners = listeners.filter((l) => l !== listener)
+      listeners = listeners.filter(l => l !== listener)
     }
   }, [])
 
@@ -59,7 +59,7 @@ export function useToast() {
   )
 
   const dismiss = useCallback((id: string) => {
-    globalToasts = globalToasts.filter((toast) => toast.id !== id)
+    globalToasts = globalToasts.filter(toast => toast.id !== id)
     notify()
   }, [])
 

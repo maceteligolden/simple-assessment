@@ -46,4 +46,3 @@ export function useRemoveParticipant(examId: string, onSuccess?: () => void) {
     error,
   }
 }
-

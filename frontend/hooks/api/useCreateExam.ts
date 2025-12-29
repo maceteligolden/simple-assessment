@@ -90,9 +90,12 @@ export function useCreateExam(onSuccess?: () => void) {
             isUndefined: rawResponse === undefined,
             isObject: typeof rawResponse === 'object' && rawResponse !== null,
             isArray: Array.isArray(rawResponse),
-            keys: rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)
-              ? Object.keys(rawResponse)
-              : 'not an object',
+            keys:
+              rawResponse &&
+              typeof rawResponse === 'object' &&
+              !Array.isArray(rawResponse)
+                ? Object.keys(rawResponse)
+                : 'not an object',
           })
 
           examResponse = rawResponse
@@ -110,7 +113,9 @@ export function useCreateExam(onSuccess?: () => void) {
           examResponse,
           examResponseType: typeof examResponse,
           examResponseKeys:
-            examResponse && typeof examResponse === 'object' && !Array.isArray(examResponse)
+            examResponse &&
+            typeof examResponse === 'object' &&
+            !Array.isArray(examResponse)
               ? Object.keys(examResponse)
               : 'not an object',
           hasId:
@@ -119,7 +124,9 @@ export function useCreateExam(onSuccess?: () => void) {
             !Array.isArray(examResponse) &&
             'id' in examResponse,
           idValue:
-            examResponse && typeof examResponse === 'object' && !Array.isArray(examResponse)
+            examResponse &&
+            typeof examResponse === 'object' &&
+            !Array.isArray(examResponse)
               ? (examResponse as any).id
               : 'N/A',
           idType:
@@ -134,29 +141,37 @@ export function useCreateExam(onSuccess?: () => void) {
         // ResponseUtil.created returns { success: true, data: {...} }
         // useApi already extracts the data property, so examResponse should be the data object
         if (!examResponse) {
-          console.error('[Create Exam] Step 1: Exam response is null/undefined', {
-            examResponse,
-            expectedStructure: {
-              id: 'string (required)',
-              title: 'string (required)',
-              description: 'string (optional)',
-              duration: 'number (required)',
-              availableAnytime: 'boolean (required)',
-              randomizeQuestions: 'boolean (required)',
-              createdAt: 'string (required)',
-            },
-          })
-          throw new Error('Invalid response from exam creation endpoint: response is null or undefined')
+          console.error(
+            '[Create Exam] Step 1: Exam response is null/undefined',
+            {
+              examResponse,
+              expectedStructure: {
+                id: 'string (required)',
+                title: 'string (required)',
+                description: 'string (optional)',
+                duration: 'number (required)',
+                availableAnytime: 'boolean (required)',
+                randomizeQuestions: 'boolean (required)',
+                createdAt: 'string (required)',
+              },
+            }
+          )
+          throw new Error(
+            'Invalid response from exam creation endpoint: response is null or undefined'
+          )
         }
 
         // Validate that response is an object (not array, not primitive)
         if (typeof examResponse !== 'object' || Array.isArray(examResponse)) {
-          console.error('[Create Exam] Step 1: Exam response is not a valid object', {
-            examResponse,
-            examResponseType: typeof examResponse,
-            isArray: Array.isArray(examResponse),
-            expectedType: 'object (not array)',
-          })
+          console.error(
+            '[Create Exam] Step 1: Exam response is not a valid object',
+            {
+              examResponse,
+              examResponseType: typeof examResponse,
+              isArray: Array.isArray(examResponse),
+              expectedType: 'object (not array)',
+            }
+          )
           throw new Error(
             `Invalid response from exam creation endpoint: expected object, got ${typeof examResponse}${Array.isArray(examResponse) ? ' (array)' : ''}`
           )
@@ -164,20 +179,25 @@ export function useCreateExam(onSuccess?: () => void) {
 
         // Validate id property exists
         if (!('id' in examResponse)) {
-          console.error('[Create Exam] Step 1: Exam response missing id property', {
-            examResponse,
-            examResponseKeys: Object.keys(examResponse),
-            expectedStructure: {
-              id: 'string (required)',
-              title: 'string (required)',
-              description: 'string (optional)',
-              duration: 'number (required)',
-              availableAnytime: 'boolean (required)',
-              randomizeQuestions: 'boolean (required)',
-              createdAt: 'string (required)',
-            },
-          })
-          throw new Error('Invalid response from exam creation endpoint: missing exam id property')
+          console.error(
+            '[Create Exam] Step 1: Exam response missing id property',
+            {
+              examResponse,
+              examResponseKeys: Object.keys(examResponse),
+              expectedStructure: {
+                id: 'string (required)',
+                title: 'string (required)',
+                description: 'string (optional)',
+                duration: 'number (required)',
+                availableAnytime: 'boolean (required)',
+                randomizeQuestions: 'boolean (required)',
+                createdAt: 'string (required)',
+              },
+            }
+          )
+          throw new Error(
+            'Invalid response from exam creation endpoint: missing exam id property'
+          )
         }
 
         const examId = examResponse.id
@@ -197,15 +217,18 @@ export function useCreateExam(onSuccess?: () => void) {
         }
 
         // Confirm id is being passed correctly
-        console.log('[Create Exam] Step 1: Exam created successfully with valid id', {
-          examId,
-          examIdType: typeof examId,
-          examIdLength: examId.length,
-          examIdValue: examId,
-          examTitle: examResponse.title,
-          fullResponse: examResponse,
-          idConfirmed: true,
-        })
+        console.log(
+          '[Create Exam] Step 1: Exam created successfully with valid id',
+          {
+            examId,
+            examIdType: typeof examId,
+            examIdLength: examId.length,
+            examIdValue: examId,
+            examTitle: examResponse.title,
+            fullResponse: examResponse,
+            idConfirmed: true,
+          }
+        )
 
         console.log('[Create Exam] Step 2: Adding questions', {
           examId,
@@ -223,25 +246,29 @@ export function useCreateExam(onSuccess?: () => void) {
               : question.type === 'multiple-select'
                 ? 'multiple-select'
                 : question.type
-          
+
           const questionPayload = {
             type: backendType,
             question: question.question,
-            options: question.options,
+            options: (question as any).options,
             correctAnswer: question.correctAnswer,
             points: question.points || 1,
             // Note: order is calculated by the backend based on existing questions
           }
 
-          console.log(`[Create Exam] Step 2.${i + 1}: Adding question ${i + 1}/${examData.questions.length}`, {
-            endpoint: `${API_ENDPOINTS.EXAMS.BASE}/${examId}/questions`,
-            payload: {
-              ...questionPayload,
-              correctAnswer: typeof questionPayload.correctAnswer === 'string' 
-                ? `[Index: ${questionPayload.correctAnswer}]` 
-                : questionPayload.correctAnswer, // Log index instead of full answer for security
-            },
-          })
+          console.log(
+            `[Create Exam] Step 2.${i + 1}: Adding question ${i + 1}/${examData.questions.length}`,
+            {
+              endpoint: `${API_ENDPOINTS.EXAMS.BASE}/${examId}/questions`,
+              payload: {
+                ...questionPayload,
+                correctAnswer:
+                  typeof questionPayload.correctAnswer === 'string'
+                    ? `[Index: ${questionPayload.correctAnswer}]`
+                    : questionPayload.correctAnswer, // Log index instead of full answer for security
+              },
+            }
+          )
 
           const questionResponse = await api.post(
             `${API_ENDPOINTS.EXAMS.BASE}/${examId}/questions`,
@@ -249,9 +276,12 @@ export function useCreateExam(onSuccess?: () => void) {
             { requiresAuth: true }
           )
 
-          console.log(`[Create Exam] Step 2.${i + 1}: Question ${i + 1} added successfully`, {
-            questionResponse,
-          })
+          console.log(
+            `[Create Exam] Step 2.${i + 1}: Question ${i + 1} added successfully`,
+            {
+              questionResponse,
+            }
+          )
         }
 
         // Step 3: Fetch the complete exam with questions
@@ -276,32 +306,47 @@ export function useCreateExam(onSuccess?: () => void) {
             ? examDetailResponse.questions.length
             : 'not an array',
           hasParticipants: 'participants' in (examDetailResponse as any),
-          participantsCount: Array.isArray((examDetailResponse as any)?.participants)
+          participantsCount: Array.isArray(
+            (examDetailResponse as any)?.participants
+          )
             ? ((examDetailResponse as any)?.participants?.length ?? 0)
             : 'not an array',
         })
 
         // Validate the exam detail response
         if (!examDetailResponse) {
-          console.error('[Create Exam] Step 3: Exam detail response is null/undefined')
-          throw new Error('Failed to fetch exam details: response is null or undefined')
+          console.error(
+            '[Create Exam] Step 3: Exam detail response is null/undefined'
+          )
+          throw new Error(
+            'Failed to fetch exam details: response is null or undefined'
+          )
         }
 
-        if (!examDetailResponse.id || typeof examDetailResponse.id !== 'string') {
-          console.error('[Create Exam] Step 3: Invalid exam id in detail response', {
-            examDetailResponse,
-            idValue: examDetailResponse.id,
-            idType: typeof examDetailResponse.id,
-          })
+        if (
+          !examDetailResponse.id ||
+          typeof examDetailResponse.id !== 'string'
+        ) {
+          console.error(
+            '[Create Exam] Step 3: Invalid exam id in detail response',
+            {
+              examDetailResponse,
+              idValue: examDetailResponse.id,
+              idType: typeof examDetailResponse.id,
+            }
+          )
           throw new Error('Invalid exam ID in detail response')
         }
 
         // Ensure questions is an array
         if (!Array.isArray(examDetailResponse.questions)) {
-          console.warn('[Create Exam] Step 3: Questions is not an array, defaulting to empty array', {
-            questions: examDetailResponse.questions,
-            questionsType: typeof examDetailResponse.questions,
-          })
+          console.warn(
+            '[Create Exam] Step 3: Questions is not an array, defaulting to empty array',
+            {
+              questions: examDetailResponse.questions,
+              questionsType: typeof examDetailResponse.questions,
+            }
+          )
           examDetailResponse.questions = []
         }
 
@@ -333,13 +378,13 @@ export function useCreateExam(onSuccess?: () => void) {
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to create exam'
-        
+
         console.error('[Create Exam] ❌ Error creating exam', {
           error: err,
           errorMessage,
           stack: err instanceof Error ? err.stack : undefined,
         })
-        
+
         setError(errorMessage)
         return { success: false, error: errorMessage }
       } finally {
@@ -355,4 +400,3 @@ export function useCreateExam(onSuccess?: () => void) {
     error,
   }
 }
-

@@ -11,7 +11,7 @@ interface ParticipantExam {
   questionCount: number
   accessCode: string
   addedAt: string
-  attemptStatus?: typeof EXAM_ATTEMPT_STATUS[keyof typeof EXAM_ATTEMPT_STATUS]
+  attemptStatus?: (typeof EXAM_ATTEMPT_STATUS)[keyof typeof EXAM_ATTEMPT_STATUS]
   attemptId?: string
   score?: number
   maxScore?: number

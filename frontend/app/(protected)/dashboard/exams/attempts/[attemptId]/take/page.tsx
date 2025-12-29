@@ -55,27 +55,29 @@ export default function TakeExamPage() {
             ? 'multiple-select'
             : backendQuestion.type
 
-      const mappedQuestion: Question = {
+      const mappedQuestion = {
         id: backendQuestion.id,
         type: questionType as 'multiple-choice' | 'multiple-select',
         question: backendQuestion.question,
         options: backendQuestion.options || [],
         points: backendQuestion.points,
         order: backendQuestion.order,
-        correctAnswer:
-          questionType === 'multiple-select' ? [] : '', // Not provided by backend for security
-      }
+        correctAnswer: questionType === 'multiple-select' ? [] : '', // Not provided by backend for security
+      } as Question
 
       // Debug logging
       console.log('[Take Exam] Question received:', {
         original: backendQuestion,
         mapped: mappedQuestion,
-        hasOptions: !!mappedQuestion.options,
-        optionsLength: mappedQuestion.options?.length,
+        hasOptions: !!(mappedQuestion as any).options,
+        optionsLength: (mappedQuestion as any).options?.length,
       })
 
       // Validate question structure
-      if (!mappedQuestion.options || mappedQuestion.options.length === 0) {
+      if (
+        !(mappedQuestion as any).options ||
+        (mappedQuestion as any).options.length === 0
+      ) {
         console.error('[Take Exam] Question missing options:', mappedQuestion)
         toastError('Question data is invalid: missing options', 'Error')
         return

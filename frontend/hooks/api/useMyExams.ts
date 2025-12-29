@@ -12,7 +12,7 @@ interface MyExam {
   questionCount: number
   accessCode: string
   addedAt: string
-  attemptStatus?: typeof EXAM_ATTEMPT_STATUS[keyof typeof EXAM_ATTEMPT_STATUS]
+  attemptStatus?: (typeof EXAM_ATTEMPT_STATUS)[keyof typeof EXAM_ATTEMPT_STATUS]
   attemptId?: string
   score?: number
   maxScore?: number
@@ -47,7 +47,9 @@ export function useMyExams(
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exams, setExams] = useState<MyExam[]>([])
-  const [pagination, setPagination] = useState<MyExamsResponse['pagination'] | null>(null)
+  const [pagination, setPagination] = useState<
+    MyExamsResponse['pagination'] | null
+  >(null)
 
   const fetchMyExams = useCallback(async () => {
     try {
@@ -63,7 +65,8 @@ export function useMyExams(
       params.append('limit', limit.toString())
       if (search) params.append('search', search)
       if (status) params.append('status', status)
-      if (isAvailable !== undefined) params.append('isAvailable', isAvailable.toString())
+      if (isAvailable !== undefined)
+        params.append('isAvailable', isAvailable.toString())
 
       const response = await fetch(
         `${API_BASE_URL}/api/v1/exams/my-exams?${params.toString()}`,
@@ -79,14 +82,17 @@ export function useMyExams(
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error?.message || `Failed to fetch exams: ${response.statusText}`)
+        throw new Error(
+          errorData.error?.message ||
+            `Failed to fetch exams: ${response.statusText}`
+        )
       }
 
       const jsonResponse = await response.json()
 
       if (jsonResponse.success && jsonResponse.data) {
         setExams(jsonResponse.data || [])
-        
+
         if (jsonResponse.meta) {
           setPagination({
             page: jsonResponse.meta.page || page,
@@ -99,7 +105,7 @@ export function useMyExams(
         } else {
           setPagination(null)
         }
-        
+
         return { success: true, data: jsonResponse }
       } else {
         throw new Error(jsonResponse.error?.message || 'Failed to fetch exams')
@@ -121,15 +127,15 @@ export function useMyExams(
   // Separate exams into taken and available
   // Backend returns 'submitted' for completed exams, but interface uses 'completed'
   const takenExams = exams.filter(
-    (exam) => 
+    exam =>
       exam.attemptStatus === EXAM_ATTEMPT_STATUS.COMPLETED ||
       exam.attemptStatus === EXAM_ATTEMPT_STATUS.SUBMITTED ||
       (exam.attemptStatus === undefined && exam.score !== undefined) // Fallback: if has score, it's taken
   )
   const availableExams = exams.filter(
-    (exam) => 
+    exam =>
       (exam.attemptStatus === EXAM_ATTEMPT_STATUS.NOT_STARTED ||
-        exam.attemptStatus === undefined) && 
+        exam.attemptStatus === undefined) &&
       exam.isAvailable
   )
 
@@ -143,4 +149,3 @@ export function useMyExams(
     error,
   }
 }
-

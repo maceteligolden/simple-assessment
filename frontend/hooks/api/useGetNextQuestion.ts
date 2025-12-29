@@ -35,29 +35,26 @@ export function useGetNextQuestion() {
     apiRef.current = api
   }, [api])
 
-  const getNextQuestion = useCallback(
-    async (attemptId: string) => {
-      try {
-        setIsLoading(true)
-        setError(null)
+  const getNextQuestion = useCallback(async (attemptId: string) => {
+    try {
+      setIsLoading(true)
+      setError(null)
 
-        const data = await apiRef.current.get<GetNextQuestionResponse>(
-          API_ENDPOINTS.ATTEMPTS.NEXT_QUESTION(attemptId),
-          { requiresAuth: true }
-        )
+      const data = await apiRef.current.get<GetNextQuestionResponse>(
+        API_ENDPOINTS.ATTEMPTS.NEXT_QUESTION(attemptId),
+        { requiresAuth: true }
+      )
 
-        return { success: true, data }
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : 'Failed to get next question'
-        setError(errorMessage)
-        return { success: false, error: errorMessage }
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    []
-  )
+      return { success: true, data }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to get next question'
+      setError(errorMessage)
+      return { success: false, error: errorMessage }
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
   return {
     getNextQuestion,
@@ -65,4 +62,3 @@ export function useGetNextQuestion() {
     error,
   }
 }
-

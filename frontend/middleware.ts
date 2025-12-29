@@ -35,21 +35,21 @@ function matchesRoute(pathname: string, route: string): boolean {
  * Check if pathname is a public route
  */
 function isPublicRoute(pathname: string): boolean {
-  return publicRoutes.some((route) => matchesRoute(pathname, route))
+  return publicRoutes.some(route => matchesRoute(pathname, route))
 }
 
 /**
  * Check if pathname is a protected route
  */
 function isProtectedRoute(pathname: string): boolean {
-  return protectedRoutes.some((route) => matchesRoute(pathname, route))
+  return protectedRoutes.some(route => matchesRoute(pathname, route))
 }
 
 /**
  * Check if pathname is an auth route (login/signup)
  */
 function isAuthRoute(pathname: string): boolean {
-  return authRoutes.some((route) => matchesRoute(pathname, route))
+  return authRoutes.some(route => matchesRoute(pathname, route))
 }
 
 /**
@@ -115,4 +115,3 @@ export const config = {
     '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
-

@@ -50,4 +50,3 @@ export function isTokenExpired(token: string): boolean {
     return true // If we can't parse, consider it expired
   }
 }
-

@@ -48,7 +48,7 @@ export default function CreateExamForm({
   })
 
   const [questions, setQuestions] = useState<Question[]>(
-    initialData?.questions.map((q, index) => ({
+    (initialData?.questions as any[])?.map((q: any, index: number) => ({
       id: `q-${index}-${Date.now()}`,
       type: q.type,
       question:
@@ -76,7 +76,7 @@ export default function CreateExamForm({
         passPercentage: initialData.passPercentage?.toString() || '50',
       })
       setQuestions(
-        initialData.questions.map((q, index) => ({
+        (initialData.questions as any[]).map((q: any, index: number) => ({
           id: `q-${index}-${Date.now()}`,
           type: q.type,
           question:
@@ -141,11 +141,11 @@ export default function CreateExamForm({
         type: questionType,
         question: '',
         options:
-          questionType === 'multiple-choice' || questionType === 'multiple-select'
+          questionType === 'multiple-choice' ||
+          questionType === 'multiple-select'
             ? ['', '']
             : [],
-        correctAnswer:
-          questionType === 'multiple-select' ? [] : '',
+        correctAnswer: questionType === 'multiple-select' ? [] : '',
       },
     ])
     setShowQuestionTypeSelector(false)
@@ -353,10 +353,10 @@ export default function CreateExamForm({
       questions: questions.map(q => ({
         type: q.type,
         question: q.question.trim(),
-        options: q.options.map(opt => opt.trim()),
+        options: (q as any).options?.map((opt: string) => opt.trim()) || [],
         correctAnswer: q.correctAnswer,
         points: 1, // Default points, can be made configurable later
-      })),
+      })) as any,
     }
 
     onSubmit(examData)
@@ -457,8 +457,9 @@ export default function CreateExamForm({
             )}
             {disablePassPercentage ? (
               <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
-              Pass percentage cannot be edited. Participants have already started this exam.
-            </p>
+                Pass percentage cannot be edited. Participants have already
+                started this exam.
+              </p>
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Minimum percentage required to pass the exam (1-100%)
@@ -759,9 +760,7 @@ export default function CreateExamForm({
                                   : 'text-gray-600 dark:text-gray-400'
                               }`}
                             >
-                              {isCorrect
-                                ? 'Correct Answer'
-                                : 'Mark as Correct'}
+                              {isCorrect ? 'Correct Answer' : 'Mark as Correct'}
                             </span>
                             {question.type === 'multiple-select' &&
                               isCorrect && (
@@ -777,7 +776,11 @@ export default function CreateExamForm({
                           <Input
                             value={option}
                             onChange={e =>
-                              updateOption(question.id, optIndex, e.target.value)
+                              updateOption(
+                                question.id,
+                                optIndex,
+                                e.target.value
+                              )
                             }
                             placeholder={`Option ${optIndex + 1}`}
                             className="flex-1"

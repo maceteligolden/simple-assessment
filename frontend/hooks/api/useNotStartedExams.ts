@@ -40,7 +40,9 @@ export function useNotStartedExams(
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exams, setExams] = useState<NotStartedExam[]>([])
-  const [pagination, setPagination] = useState<NotStartedExamsResponse['pagination'] | null>(null)
+  const [pagination, setPagination] = useState<
+    NotStartedExamsResponse['pagination'] | null
+  >(null)
 
   const fetchNotStartedExams = useCallback(async () => {
     try {
@@ -55,7 +57,8 @@ export function useNotStartedExams(
       params.append('page', page.toString())
       params.append('limit', limit.toString())
       if (search) params.append('search', search)
-      if (isAvailable !== undefined) params.append('isAvailable', isAvailable.toString())
+      if (isAvailable !== undefined)
+        params.append('isAvailable', isAvailable.toString())
 
       const response = await fetch(
         `${API_BASE_URL}/api/v1/exams/my-exams/not-started?${params.toString()}`,
@@ -71,14 +74,17 @@ export function useNotStartedExams(
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error?.message || `Failed to fetch not-started exams: ${response.statusText}`)
+        throw new Error(
+          errorData.error?.message ||
+            `Failed to fetch not-started exams: ${response.statusText}`
+        )
       }
 
       const jsonResponse = await response.json()
 
       if (jsonResponse.success && jsonResponse.data) {
         setExams(jsonResponse.data || [])
-        
+
         if (jsonResponse.meta) {
           setPagination({
             page: jsonResponse.meta.page || page,
@@ -91,10 +97,12 @@ export function useNotStartedExams(
         } else {
           setPagination(null)
         }
-        
+
         return { success: true, data: jsonResponse }
       } else {
-        throw new Error(jsonResponse.error?.message || 'Failed to fetch not-started exams')
+        throw new Error(
+          jsonResponse.error?.message || 'Failed to fetch not-started exams'
+        )
       }
     } catch (err) {
       const errorMessage =
@@ -118,4 +126,3 @@ export function useNotStartedExams(
     error,
   }
 }
-

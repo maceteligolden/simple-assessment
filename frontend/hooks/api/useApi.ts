@@ -1,5 +1,10 @@
 import { useCallback, useRef } from 'react'
-import { useAppSelector, useAppDispatch, useAppStore, type RootState } from '@/store/store'
+import {
+  useAppSelector,
+  useAppDispatch,
+  useAppStore,
+  type RootState,
+} from '@/store/store'
 import { refreshTokenSuccess, logout } from '@/store/slices/authSlice'
 import { API_ENDPOINTS, ENV } from '@/constants'
 import { RefreshTokenOutput } from '@/interfaces/auth.interface'
@@ -45,13 +50,16 @@ export function useApi() {
     // Create refresh promise
     refreshPromiseRef.current = (async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH.REFRESH}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ refreshToken: currentRefreshToken }),
-        })
+        const response = await fetch(
+          `${API_BASE_URL}${API_ENDPOINTS.AUTH.REFRESH}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ refreshToken: currentRefreshToken }),
+          }
+        )
 
         if (!response.ok) {
           throw new Error('Token refresh failed')
@@ -80,7 +88,12 @@ export function useApi() {
       endpoint: string,
       options: RequestOptions = {}
     ): Promise<T> => {
-      const { requiresAuth = false, skipAutoRefresh = false, headers = {}, ...restOptions } = options
+      const {
+        requiresAuth = false,
+        skipAutoRefresh = false,
+        headers = {},
+        ...restOptions
+      } = options
 
       // Automatically require auth for exam endpoints
       const isExamEndpoint = endpoint.startsWith('/api/v1/exams')
@@ -110,7 +123,9 @@ export function useApi() {
               throw new Error('Authentication failed. Please sign in again.')
             }
             // Get updated token after refresh
-            currentAccessToken = getCurrentAccessToken() || (store.getState() as RootState).auth.accessToken
+            currentAccessToken =
+              getCurrentAccessToken() ||
+              (store.getState() as RootState).auth.accessToken
           }
 
           if (currentAccessToken) {
@@ -128,13 +143,13 @@ export function useApi() {
           method: restOptions.method || 'GET',
           endpoint: `${API_BASE_URL}${endpoint}`,
           hasAuth: !!requestHeaders.Authorization,
-          authHeader: requestHeaders.Authorization 
-            ? `${requestHeaders.Authorization.substring(0, 20)}...` 
+          authHeader: requestHeaders.Authorization
+            ? `${requestHeaders.Authorization.substring(0, 20)}...`
             : 'none',
-          payload: restOptions.body 
-            ? (typeof restOptions.body === 'string' 
-                ? JSON.parse(restOptions.body) 
-                : restOptions.body)
+          payload: restOptions.body
+            ? typeof restOptions.body === 'string'
+              ? JSON.parse(restOptions.body)
+              : restOptions.body
             : undefined,
         })
       }
@@ -179,8 +194,11 @@ export function useApi() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.error?.message || errorData.message || `HTTP error! status: ${response.status}`
-        
+        const errorMessage =
+          errorData.error?.message ||
+          errorData.message ||
+          `HTTP error! status: ${response.status}`
+
         // Create error with status code for optimistic locking detection
         const error: any = new Error(errorMessage)
         error.status = response.status
@@ -201,7 +219,7 @@ export function useApi() {
         })
         throw new Error('Invalid JSON response from server')
       }
-      
+
       // Log full response for exam endpoints to debug
       if (isExamEndpoint) {
         console.log('[API Response] Full response body', {
@@ -211,25 +229,36 @@ export function useApi() {
           hasData: 'data' in jsonResponse,
           hasError: 'error' in jsonResponse,
           dataType: jsonResponse.data ? typeof jsonResponse.data : 'undefined',
-          dataKeys: jsonResponse.data && typeof jsonResponse.data === 'object' 
-            ? Object.keys(jsonResponse.data) 
-            : 'not an object',
+          dataKeys:
+            jsonResponse.data && typeof jsonResponse.data === 'object'
+              ? Object.keys(jsonResponse.data)
+              : 'not an object',
         })
       }
-      
+
       // Extract data from standardized API response format
       // Backend returns { success: true, data: {...} } or { success: false, error: {...} }
-      if (jsonResponse && jsonResponse.success === true && jsonResponse.data !== undefined) {
+      if (
+        jsonResponse &&
+        jsonResponse.success === true &&
+        jsonResponse.data !== undefined
+      ) {
         return jsonResponse.data
       }
-      
+
       // If response doesn't follow standard format, check if it's the data directly
       // Some endpoints might return data directly without the wrapper
-      if (jsonResponse && (jsonResponse.id || (typeof jsonResponse === 'object' && !jsonResponse.success && !jsonResponse.error))) {
+      if (
+        jsonResponse &&
+        (jsonResponse.id ||
+          (typeof jsonResponse === 'object' &&
+            !jsonResponse.success &&
+            !jsonResponse.error))
+      ) {
         // If it has an id or looks like data (not an error response), return it
         return jsonResponse
       }
-      
+
       // Log warning if response structure is unexpected
       if (isExamEndpoint) {
         console.warn('[API Response] Unexpected response structure', {
@@ -238,12 +267,12 @@ export function useApi() {
           responseType: typeof jsonResponse,
         })
       }
-      
+
       // If we have an error in the response, throw it
       if (jsonResponse && jsonResponse.error) {
         throw new Error(jsonResponse.error.message || 'API request failed')
       }
-      
+
       return jsonResponse
     },
     [getCurrentAccessToken, refreshAccessToken]

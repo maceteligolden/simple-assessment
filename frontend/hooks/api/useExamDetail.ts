@@ -22,7 +22,7 @@ export function useExamDetail(examId: string) {
     try {
       setIsLoading(true)
       setError(null)
-      
+
       // Backend returns exam object directly (not wrapped in { exam: ... })
       // Structure: { id, title, description, duration, questions, participants, ... }
       const data = await apiRef.current.get<any>(
@@ -46,6 +46,7 @@ export function useExamDetail(examId: string) {
         startDate: data.startDate,
         endDate: data.endDate,
         randomizeQuestions: data.randomizeQuestions,
+        showResultsImmediately: data.showResultsImmediately ?? true,
         passPercentage: data.passPercentage || 50,
         version: data.version, // Include version for optimistic locking
         createdAt: data.createdAt,
@@ -53,21 +54,21 @@ export function useExamDetail(examId: string) {
       }
 
       // Map participants from backend to frontend interface
-      const mappedParticipants: ExamParticipant[] = (data.participants || []).map(
-        (p: any) => ({
-          id: p.id,
-          examId: examId,
-          email: p.email,
-          accessCode: p.accessCode,
-          hasStarted: p.isUsed || false,
-          hasCompleted: false, // Will be determined by attempt status if available
-          score: undefined,
-          maxScore: undefined,
-          startedAt: undefined,
-          completedAt: undefined,
-          createdAt: p.addedAt || p.createdAt,
-        })
-      )
+      const mappedParticipants: ExamParticipant[] = (
+        data.participants || []
+      ).map((p: any) => ({
+        id: p.id,
+        examId: examId,
+        email: p.email,
+        accessCode: p.accessCode,
+        hasStarted: p.isUsed || false,
+        hasCompleted: false, // Will be determined by attempt status if available
+        score: undefined,
+        maxScore: undefined,
+        startedAt: undefined,
+        completedAt: undefined,
+        createdAt: p.addedAt || p.createdAt,
+      }))
 
       setExam(mappedExam)
       setParticipants(mappedParticipants)
@@ -92,4 +93,3 @@ export function useExamDetail(examId: string) {
     refetch: fetchExamDetail,
   }
 }
-

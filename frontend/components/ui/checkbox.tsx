@@ -3,8 +3,7 @@
 import * as React from 'react'
 import { cn } from '@/utils'
 
-export interface CheckboxProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {}
+export interface CheckboxProps extends React.InputHTMLAttributes<HTMLInputElement> {}
 
 const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
   ({ className, ...props }, ref) => {
@@ -24,4 +23,3 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
 Checkbox.displayName = 'Checkbox'
 
 export { Checkbox }
-

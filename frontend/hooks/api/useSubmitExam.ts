@@ -19,27 +19,30 @@ export function useSubmitExam() {
     apiRef.current = api
   }, [api])
 
-  const submitExam = useCallback(async (attemptId: string) => {
-    try {
-      setIsLoading(true)
-      setError(null)
+  const submitExam = useCallback(
+    async (attemptId: string) => {
+      try {
+        setIsLoading(true)
+        setError(null)
 
-      const data = await apiRef.current.post<SubmitExamResponse>(
-        API_ENDPOINTS.EXAMS.SUBMIT(attemptId),
-        {},
-        { requiresAuth: true }
-      )
+        const data = await apiRef.current.post<SubmitExamResponse>(
+          API_ENDPOINTS.EXAMS.SUBMIT(attemptId),
+          {},
+          { requiresAuth: true }
+        )
 
-      return { success: true, data }
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to submit exam'
-      setError(errorMessage)
-      return { success: false, error: errorMessage }
-    } finally {
-      setIsLoading(false)
-    }
-  }, [api])
+        return { success: true, data }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to submit exam'
+        setError(errorMessage)
+        return { success: false, error: errorMessage }
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [api]
+  )
 
   return {
     submitExam,
@@ -47,4 +50,3 @@ export function useSubmitExam() {
     error,
   }
 }
-

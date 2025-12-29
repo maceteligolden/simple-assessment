@@ -11,7 +11,7 @@ export const ENVIRONMENT = {
   PRODUCTION: 'production',
 } as const
 
-export type Environment = typeof ENVIRONMENT[keyof typeof ENVIRONMENT]
+export type Environment = (typeof ENVIRONMENT)[keyof typeof ENVIRONMENT]
 
 /**
  * Environment variables
@@ -32,4 +32,3 @@ export const isDevelopment = (): boolean => {
 export const isProduction = (): boolean => {
   return ENV.NODE_ENV === ENVIRONMENT.PRODUCTION
 }
-

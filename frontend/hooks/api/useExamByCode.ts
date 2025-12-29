@@ -38,12 +38,7 @@ const mockExam: Exam = {
       id: '3',
       type: 'multiple-choice',
       question: 'What is the correct way to declare a JavaScript variable?',
-      options: [
-        'variable name;',
-        'var name;',
-        'v name;',
-        'variable = name;',
-      ],
+      options: ['variable name;', 'var name;', 'v name;', 'variable = name;'],
       correctAnswer: '1',
       points: 1,
       order: 3,
@@ -53,6 +48,8 @@ const mockExam: Exam = {
   isPublic: true,
   availableAnytime: true,
   randomizeQuestions: false,
+  showResultsImmediately: true,
+  passPercentage: 70,
   createdAt: '2024-01-15T10:00:00Z',
   updatedAt: '2024-01-15T10:00:00Z',
 }
@@ -81,7 +78,7 @@ export function useExamByCode() {
         // Mock data for testing
         if (MOCK_ACCESS_CODES[accessCode]) {
           // Simulate API delay
-          await new Promise((resolve) => setTimeout(resolve, 500))
+          await new Promise(resolve => setTimeout(resolve, 500))
           setExam(MOCK_ACCESS_CODES[accessCode])
           return { success: true, exam: MOCK_ACCESS_CODES[accessCode] }
         }
@@ -105,6 +102,8 @@ export function useExamByCode() {
           startDate: data.startDate,
           endDate: data.endDate,
           randomizeQuestions: data.randomizeQuestions,
+          showResultsImmediately: data.showResultsImmediately ?? true,
+          passPercentage: data.passPercentage || 50,
           createdAt: '', // Not provided in by-code response
           updatedAt: '', // Not provided in by-code response
         }
@@ -137,4 +136,3 @@ export function useExamByCode() {
     reset,
   }
 }
-

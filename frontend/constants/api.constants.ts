@@ -21,13 +21,16 @@ export const API_ENDPOINTS = {
     BY_CODE: (code: string) => `/api/v1/exams/by-code/${code}`,
     START: '/api/v1/exams/start',
     SUBMIT: (attemptId: string) => `/api/v1/exams/attempts/${attemptId}/submit`,
-    RESULTS: (attemptId: string) => `/api/v1/exams/attempts/${attemptId}/results`,
+    RESULTS: (attemptId: string) =>
+      `/api/v1/exams/attempts/${attemptId}/results`,
     EXAM_RESULTS: (examId: string) => `/api/v1/exams/${examId}/results`,
   },
   // Exam Attempt endpoints
   ATTEMPTS: {
-    NEXT_QUESTION: (attemptId: string) => `/api/v1/exams/attempts/${attemptId}/questions/next`,
-    SUBMIT_ANSWER: (attemptId: string, questionId: string) => `/api/v1/exams/attempts/${attemptId}/answers/${questionId}`,
+    NEXT_QUESTION: (attemptId: string) =>
+      `/api/v1/exams/attempts/${attemptId}/questions/next`,
+    SUBMIT_ANSWER: (attemptId: string, questionId: string) =>
+      `/api/v1/exams/attempts/${attemptId}/answers/${questionId}`,
   },
   // Results endpoints
   RESULTS: {

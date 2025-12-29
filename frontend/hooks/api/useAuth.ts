@@ -95,28 +95,25 @@ export function useAuth() {
   /**
    * Refresh access token using refresh token
    */
-  const refreshAccessToken = useCallback(
-    async (): Promise<boolean> => {
-      const currentRefreshToken = refreshToken || getRefreshToken()
-      if (!currentRefreshToken) {
-        return false
-      }
+  const refreshAccessToken = useCallback(async (): Promise<boolean> => {
+    const currentRefreshToken = refreshToken || getRefreshToken()
+    if (!currentRefreshToken) {
+      return false
+    }
 
-      try {
-        const response = await api.post<RefreshTokenOutput>(
-          API_ENDPOINTS.AUTH.REFRESH,
-          { refreshToken: currentRefreshToken } as RefreshTokenInput
-        )
-        dispatch(refreshTokenSuccess(response))
-        return true
-      } catch (err) {
-        // Refresh failed, logout user
-        dispatch(logout())
-        return false
-      }
-    },
-    [api, dispatch, refreshToken]
-  )
+    try {
+      const response = await api.post<RefreshTokenOutput>(
+        API_ENDPOINTS.AUTH.REFRESH,
+        { refreshToken: currentRefreshToken } as RefreshTokenInput
+      )
+      dispatch(refreshTokenSuccess(response))
+      return true
+    } catch (err) {
+      // Refresh failed, logout user
+      dispatch(logout())
+      return false
+    }
+  }, [api, dispatch, refreshToken])
 
   /**
    * Get user profile

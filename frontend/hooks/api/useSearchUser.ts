@@ -12,7 +12,9 @@ export function useSearchUser() {
   const api = useApi()
   const apiRef = useRef(api)
   const [isSearching, setIsSearching] = useState(false)
-  const [searchResult, setSearchResult] = useState<UserProfileOutput | null>(null)
+  const [searchResult, setSearchResult] = useState<UserProfileOutput | null>(
+    null
+  )
   const [error, setError] = useState<string | null>(null)
 
   // Keep api ref up to date
@@ -21,7 +23,9 @@ export function useSearchUser() {
   }, [api])
 
   const searchUser = useCallback(
-    async (email: string): Promise<{ user: UserProfileOutput | null; exists: boolean }> => {
+    async (
+      email: string
+    ): Promise<{ user: UserProfileOutput | null; exists: boolean }> => {
       if (!email || !email.trim()) {
         setSearchResult(null)
         setError(null)
@@ -59,4 +63,3 @@ export function useSearchUser() {
     error,
   }
 }
-

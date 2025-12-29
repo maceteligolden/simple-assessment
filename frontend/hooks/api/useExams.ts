@@ -75,7 +75,8 @@ export function useExams(options: UseExamsOptions = {}) {
 
       // Backend returns: { success: true, data: [...], meta: { page, limit, total, ... } }
       // We need to fetch the raw response to get pagination info from meta
-      const currentAccessToken = (store.getState() as RootState).auth.accessToken
+      const currentAccessToken = (store.getState() as RootState).auth
+        .accessToken
 
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         headers: {
@@ -107,23 +108,27 @@ export function useExams(options: UseExamsOptions = {}) {
 
       // Map backend exam format to frontend Exam interface
       // Note: Backend returns questionCount and participantCount, not full arrays
-      const mappedExams: (Exam & { questionCount: number; participantCount: number })[] =
-        backendExams.map((exam) => ({
-          id: exam.id,
-          title: exam.title,
-          description: exam.description,
-          creatorId: '', // Will be populated from user context
-          questions: [], // Questions not included in list endpoint - use questionCount for display
-          timeLimit: exam.duration, // Map duration to timeLimit
-          isPublic: true, // Default value
-          availableAnytime: true, // Default value, will be fetched from detail endpoint
-          randomizeQuestions: false, // Default value
-          createdAt: exam.createdAt,
-          updatedAt: exam.createdAt,
-          // Store additional data for display
-          questionCount: exam.questionCount,
-          participantCount: exam.participantCount,
-        }))
+      const mappedExams: (Exam & {
+        questionCount: number
+        participantCount: number
+      })[] = backendExams.map(exam => ({
+        id: exam.id,
+        title: exam.title,
+        description: exam.description,
+        creatorId: '', // Will be populated from user context
+        questions: [], // Questions not included in list endpoint - use questionCount for display
+        timeLimit: exam.duration, // Map duration to timeLimit
+        isPublic: true, // Default value
+        availableAnytime: true, // Default value, will be fetched from detail endpoint
+        randomizeQuestions: false, // Default value
+        showResultsImmediately: true,
+        passPercentage: 50,
+        createdAt: exam.createdAt,
+        updatedAt: exam.createdAt,
+        // Store additional data for display
+        questionCount: exam.questionCount,
+        participantCount: exam.participantCount,
+      }))
 
       setExams(mappedExams)
       setPagination(paginationData)

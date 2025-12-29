@@ -53,7 +53,7 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    signUpStart: (state) => {
+    signUpStart: state => {
       state.isLoading = true
       state.error = null
     },
@@ -67,7 +67,10 @@ const authSlice = createSlice({
 
       // Store in localStorage
       if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, action.payload.accessToken)
+        localStorage.setItem(
+          STORAGE_KEYS.AUTH_TOKEN,
+          action.payload.accessToken
+        )
         localStorage.setItem(
           STORAGE_KEYS.REFRESH_TOKEN,
           action.payload.refreshToken
@@ -86,7 +89,7 @@ const authSlice = createSlice({
       state.refreshToken = null
       state.error = action.payload
     },
-    signInStart: (state) => {
+    signInStart: state => {
       state.isLoading = true
       state.error = null
     },
@@ -100,7 +103,10 @@ const authSlice = createSlice({
 
       // Store in localStorage and set cookie
       if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, action.payload.accessToken)
+        localStorage.setItem(
+          STORAGE_KEYS.AUTH_TOKEN,
+          action.payload.accessToken
+        )
         localStorage.setItem(
           STORAGE_KEYS.REFRESH_TOKEN,
           action.payload.refreshToken
@@ -127,7 +133,10 @@ const authSlice = createSlice({
 
       // Update localStorage and cookie
       if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, action.payload.accessToken)
+        localStorage.setItem(
+          STORAGE_KEYS.AUTH_TOKEN,
+          action.payload.accessToken
+        )
         localStorage.setItem(
           STORAGE_KEYS.REFRESH_TOKEN,
           action.payload.refreshToken
@@ -136,7 +145,7 @@ const authSlice = createSlice({
         setAuthCookie(action.payload.accessToken)
       }
     },
-    logout: (state) => {
+    logout: state => {
       state.isAuthenticated = false
       state.user = null
       state.accessToken = null
@@ -152,11 +161,11 @@ const authSlice = createSlice({
         removeAuthCookie()
       }
     },
-    clearError: (state) => {
+    clearError: state => {
       state.error = null
     },
     // Legacy actions for backward compatibility
-    loginStart: (state) => {
+    loginStart: state => {
       state.isLoading = true
       state.error = null
     },
@@ -166,7 +175,7 @@ const authSlice = createSlice({
     loginFailure: (state, action: PayloadAction<string>) => {
       authSlice.caseReducers.signInFailure(state, action)
     },
-    registerStart: (state) => {
+    registerStart: state => {
       state.isLoading = true
       state.error = null
     },

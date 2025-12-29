@@ -40,10 +40,11 @@ export function getAuthCookie(): string | null {
   if (typeof document === 'undefined') return null
 
   const cookies = document.cookie.split(';')
-  const authCookie = cookies.find((cookie) => cookie.trim().startsWith('auth_token='))
+  const authCookie = cookies.find(cookie =>
+    cookie.trim().startsWith('auth_token=')
+  )
 
   if (!authCookie) return null
 
   return authCookie.split('=')[1] || null
 }
-

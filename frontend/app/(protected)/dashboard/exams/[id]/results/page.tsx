@@ -68,6 +68,7 @@ const mockExamResult: ExamResult = {
     isPublic: true,
     availableAnytime: true,
     randomizeQuestions: false,
+    showResultsImmediately: true,
     passPercentage: 70,
     createdAt: '2024-01-15T10:00:00Z',
     updatedAt: '2024-01-15T10:00:00Z',
@@ -260,7 +261,16 @@ export default function ExamResultsPage() {
                               : 'text-red-700 dark:text-red-300 font-medium'
                           }`}
                         >
-                          {question.options[parseInt(userAnswer as string)]}
+                          {Array.isArray(userAnswer)
+                            ? userAnswer
+                                .map(
+                                  idx =>
+                                    (question as any).options[parseInt(idx)]
+                                )
+                                .join(', ')
+                            : (question as any).options[
+                                parseInt(userAnswer as string)
+                              ]}
                         </span>
                       </div>
                       {!isCorrect && (
@@ -269,7 +279,16 @@ export default function ExamResultsPage() {
                             Correct Answer:{' '}
                           </span>
                           <span className="text-sm text-green-700 dark:text-green-300 font-medium">
-                            {question.options[parseInt(question.correctAnswer)]}
+                            {Array.isArray(question.correctAnswer)
+                              ? (question.correctAnswer as string[])
+                                  .map(
+                                    idx =>
+                                      (question as any).options[parseInt(idx)]
+                                  )
+                                  .join(', ')
+                              : (question as any).options[
+                                  parseInt(question.correctAnswer as string)
+                                ]}
                           </span>
                         </div>
                       )}

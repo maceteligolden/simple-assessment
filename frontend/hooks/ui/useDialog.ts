@@ -6,7 +6,7 @@ export function useDialog() {
 
   const open = useCallback(() => setIsOpen(true), [])
   const close = useCallback(() => setIsOpen(false), [])
-  const toggle = useCallback(() => setIsOpen((prev) => !prev), [])
+  const toggle = useCallback(() => setIsOpen(prev => !prev), [])
 
   return {
     isOpen,

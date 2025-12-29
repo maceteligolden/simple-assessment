@@ -90,4 +90,3 @@ export interface AuthResponse {
   user: UserProfileOutput
   token: string
 }
-

@@ -114,4 +114,3 @@ export function useUpdateExam(onSuccess?: () => void) {
     error,
   }
 }
-

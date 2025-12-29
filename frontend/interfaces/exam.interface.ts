@@ -30,8 +30,31 @@ export interface MultipleSelectQuestion extends QuestionBase {
   correctAnswer: string[] // Array of indices of correct options (at least 2)
 }
 
+// Fill in the blank question
+export interface FillInTheBlankQuestion extends QuestionBase {
+  type: 'fill-in-the-blank'
+  correctAnswer: string
+}
+
+// Short answer question
+export interface ShortAnswerQuestion extends QuestionBase {
+  type: 'short-answer'
+  correctAnswer: string
+}
+
+// Essay question
+export interface EssayQuestion extends QuestionBase {
+  type: 'essay'
+  correctAnswer: string
+}
+
 // Union type for all question types
-export type Question = MultipleChoiceQuestion | MultipleSelectQuestion // Add other types as needed
+export type Question =
+  | MultipleChoiceQuestion
+  | MultipleSelectQuestion
+  | FillInTheBlankQuestion
+  | ShortAnswerQuestion
+  | EssayQuestion // Add other types as needed
 
 export interface Exam {
   id: string

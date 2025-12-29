@@ -58,7 +58,7 @@ export default function EditExamPage() {
         randomizeQuestions: exam.randomizeQuestions,
         showResultsImmediately: exam.showResultsImmediately ?? true,
         passPercentage: exam.passPercentage || 50,
-        questions: exam.questions.map(q => {
+        questions: exam.questions.map((q: any) => {
           // Map question from Exam format to CreateExamDto format
           const questionText =
             typeof q.question === 'string'
@@ -88,12 +88,12 @@ export default function EditExamPage() {
           }
 
           return {
-            type: questionType as 'multiple-choice' | 'multiple-select',
+            type: questionType as any,
             question: questionText,
             options: q.options || [],
             correctAnswer,
             points: q.points || 1,
-          }
+          } as any
         }),
       }
       setExamData(initialData)
@@ -174,7 +174,7 @@ export default function EditExamPage() {
         randomizeQuestions: exam.randomizeQuestions,
         showResultsImmediately: exam.showResultsImmediately ?? true,
         passPercentage: exam.passPercentage || 50,
-        questions: exam.questions.map(q => {
+        questions: exam.questions.map((q: any) => {
           const questionText =
             typeof q.question === 'string'
               ? q.question
@@ -183,14 +183,14 @@ export default function EditExamPage() {
           const questionType =
             (q.type as string) === 'multi-choice' ? 'multiple-choice' : q.type
           return {
-            type: questionType as 'multiple-choice',
+            type: questionType as any,
             question: questionText,
             options: q.options || [],
             correctAnswer: Array.isArray(q.correctAnswer)
               ? q.correctAnswer[0] || '0'
               : String(q.correctAnswer || '0'),
             points: q.points || 1,
-          }
+          } as any
         }),
       }
       setExamData(initialData)

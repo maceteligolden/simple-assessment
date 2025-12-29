@@ -56,7 +56,9 @@ export function useParticipantResult(examId: string, participantId: string) {
       setResult(data)
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to fetch participant result'
+        err instanceof Error
+          ? err.message
+          : 'Failed to fetch participant result'
       setError(errorMessage)
     } finally {
       setIsLoading(false)
@@ -74,4 +76,3 @@ export function useParticipantResult(examId: string, participantId: string) {
     refetch: fetchResult,
   }
 }
-

@@ -23,7 +23,8 @@ export function useDeleteExam(onSuccess?: () => void) {
         })
 
         // Use fetch directly for DELETE with body since useApi delete doesn't support body
-        const currentAccessToken = (store.getState() as RootState).auth.accessToken
+        const currentAccessToken = (store.getState() as RootState).auth
+          .accessToken
 
         // Backend doesn't require password, but we send it for potential future validation
         // If backend doesn't use it, it will be ignored
@@ -84,4 +85,3 @@ export function useDeleteExam(onSuccess?: () => void) {
     error,
   }
 }
-

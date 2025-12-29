@@ -3,7 +3,7 @@
  * Set to true to bypass authentication for testing purposes
  * Can be overridden via NEXT_PUBLIC_BYPASS_AUTH environment variable
  * In development, this can be toggled via localStorage
- * 
+ *
  * Note: This is evaluated at module load time. For reactive updates,
  * use the useBypassAuth hook instead.
  */
@@ -47,4 +47,3 @@ export function toggleBypassAuth(enabled: boolean): void {
     window.location.reload()
   }
 }
-

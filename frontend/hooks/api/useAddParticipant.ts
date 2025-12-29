@@ -58,4 +58,3 @@ export function useAddParticipant(examId: string, onSuccess?: () => void) {
     error,
   }
 }
-
