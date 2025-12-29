@@ -9,18 +9,6 @@ import { ResponseUtil } from '../util/response'
 import { HTTP_STATUS } from '../constants'
 
 /**
- * Extend Express Request to include user information
- * Note: user is required after authenticate middleware runs
- */
-declare global {
-  namespace Express {
-    interface Request {
-      user: JWTPayload
-    }
-  }
-}
-
-/**
  * Authentication middleware
  * Verifies JWT token and attaches user information to request
  */

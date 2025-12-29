@@ -86,6 +86,7 @@ export default function ExamResultsPage() {
     const timer = setTimeout(() => {
       setIsMarking(false)
       setResult(mockExamResult)
+      console.log('Exam results (mock) response:', mockExamResult)
     }, 2000) // 2 second delay to simulate marking
 
     return () => clearTimeout(timer)

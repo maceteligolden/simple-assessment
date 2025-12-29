@@ -1,12 +1,28 @@
 # Simple Assessment Platform
 
-A minimal online exam and assessment platform built with Next.js and Express TypeScript. This project demonstrates a full-stack application for creating, delivering, and managing online exams.
+A minimal online exam and assessment platform built with Next.js and Express TypeScript.
+
+## 🔗 Live Demo & API
+- **Live Demo**: [https://simpleassessments.netlify.app/dashboard](https://simpleassessments.netlify.app/dashboard)
+- **API Documentation**: [Swagger/OpenAPI UI](http://localhost:5008/api-docs) (Accessible when backend is running)
 
 ## 📚 Documentation
 
-- **[Quick Start Guide](./docs/quick-start.md)** - Get up and running quickly
-- **[Features Documentation](./docs/features.md)** - Comprehensive feature overview
+### Core Modules
+- **[Authentication & User Auth](./docs/AUTH.md)** - JWT, RBAC, and Session management
+- **[Exam Management](./docs/EXAM.md)** - Exam creation, scheduling, and logic
+- **[Participant Management](./docs/PARTICIPANT.md)** - Access codes and invitation system
+- **[Questions & Strategy](./docs/QUESTIONS.md)** - Question Factory and marking logic
+- **[Exam Attempt Engine](./docs/ATTEMPT.md)** - Timer, autosave, and grading
+
+### System Design
+- **[Security & Hardening](./docs/SECURITY.md)** - XSS, NoSQL, and Protection headers
+- **[Reliability & Integrity](./docs/RELIABILITY.md)** - Transactions and Error handling
+- **[Performance Optimization](./docs/PERFORMANCE.md)** - Caching, Projections, and N+1 fixes
+- **[Project Structure](./docs/PROJECT_STRUCTURE.md)** - Folder and Architecture breakdown
 - **[Database Design](./docs/database-design.md)** - Database schema and data models
+
+---
 
 ## 🚀 Features
 

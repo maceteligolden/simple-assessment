@@ -31,12 +31,14 @@ export function useCreateExam(onSuccess?: () => void) {
           endDate?: string
           randomizeQuestions: boolean
           showResultsImmediately: boolean
+          passPercentage: number
         } = {
           title: examData.title,
           duration: examData.timeLimit, // Map timeLimit to duration
           availableAnytime: examData.availableAnytime,
           randomizeQuestions: examData.randomizeQuestions ?? false,
-          showResultsImmediately: false, // Default value
+          showResultsImmediately: examData.showResultsImmediately ?? true,
+          passPercentage: examData.passPercentage,
         }
 
         // Only include description if it's not empty

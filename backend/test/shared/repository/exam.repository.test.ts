@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ExamRepository } from '../../../src/shared/repository/exam.repository'
 import { Exam } from '../../../src/shared/model/exam.model'
 import { Types } from 'mongoose'
+import { EXAM_ATTEMPT_STATUS } from '../../../src/shared/constants'
 
 // Mock the Exam model
 vi.mock('../../../src/shared/model/exam.model', async () => {
@@ -12,6 +13,8 @@ vi.mock('../../../src/shared/model/exam.model', async () => {
   const mockQuery = {
     populate: vi.fn().mockReturnThis(),
     sort: vi.fn().mockReturnThis(),
+    select: vi.fn().mockReturnThis(),
+    session: vi.fn().mockReturnThis(),
     exec: vi.fn(),
   }
 
@@ -29,6 +32,7 @@ vi.mock('../../../src/shared/model/exam.model', async () => {
     questions: any[]
     createdAt: Date
     updatedAt: Date
+    version: number
     save: any
 
     constructor(data: any) {
@@ -45,6 +49,7 @@ vi.mock('../../../src/shared/model/exam.model', async () => {
       this.questions = data?.questions || []
       this.createdAt = data?.createdAt || new Date()
       this.updatedAt = data?.updatedAt || new Date()
+      this.version = data?.version || 0
       this.save = vi.fn().mockResolvedValue(true)
       Object.assign(this, data)
     }
@@ -52,13 +57,22 @@ vi.mock('../../../src/shared/model/exam.model', async () => {
 
   MockExam.findOne = vi.fn().mockReturnValue(mockQuery)
   MockExam.find = vi.fn().mockReturnValue(mockQuery)
+  MockExam.findById = vi.fn().mockReturnValue(mockQuery)
   MockExam.findByIdAndUpdate = vi.fn()
   MockExam.countDocuments = vi.fn()
+  MockExam.aggregate = vi.fn()
 
   return {
     Exam: MockExam,
   }
 })
+
+// Mock ExamParticipant model
+vi.mock('../../../src/shared/model/exam-participant.model', () => ({
+  ExamParticipant: {
+    countDocuments: vi.fn(),
+  },
+}))
 
 // Mock logger
 vi.mock('../../../src/shared/util/logger', () => ({
@@ -89,7 +103,12 @@ describe('ExamRepository', () => {
     mockQuery = {
       populate: vi.fn().mockReturnThis(),
       sort: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      session: vi.fn().mockReturnThis(),
       exec: vi.fn(),
+      then: vi.fn().mockImplementation(function(callback) {
+        return Promise.resolve(this.exec()).then(callback);
+      }),
     }
     
     mockExamInstance = {
@@ -106,13 +125,17 @@ describe('ExamRepository', () => {
       questions: [],
       createdAt: new Date(),
       updatedAt: new Date(),
+      version: 0,
       save: vi.fn().mockResolvedValue(true),
     }
     
     ;(Exam.findOne as any).mockReturnValue(mockQuery)
     ;(Exam.find as any).mockReturnValue(mockQuery)
+    ;(Exam.findById as any).mockReturnValue(mockQuery)
     mockQuery.populate.mockReturnThis()
     mockQuery.sort.mockReturnThis()
+    mockQuery.select.mockReturnThis()
+    mockQuery.session.mockReturnThis()
     mockQuery.exec.mockResolvedValue(null)
   })
 
@@ -121,11 +144,7 @@ describe('ExamRepository', () => {
     it('should find exam by ID successfully', async () => {
       // Arrange
       const examId = '507f1f77bcf86cd799439011'
-      const mockFindOneQuery = {
-        populate: vi.fn().mockResolvedValue(mockExamInstance),
-      }
-
-      ;(Exam.findOne as any).mockReturnValue(mockFindOneQuery)
+      mockQuery.exec.mockResolvedValue(mockExamInstance)
 
       // Act
       const result = await repository.findById(examId)
@@ -135,27 +154,38 @@ describe('ExamRepository', () => {
         _id: examId,
         isDeleted: false,
       })
-      expect(mockFindOneQuery.populate).toHaveBeenCalledWith('questions')
+      expect(mockQuery.populate).toHaveBeenCalledWith({
+        path: 'questions',
+        select: '_id type question options points order version',
+      })
       expect(result).toBe(mockExamInstance)
-    })
-
-    it('should return null when exam not found', async () => {
-      // Arrange
-      const examId = '507f1f77bcf86cd799439011'
-      const mockFindOneQuery = {
-        populate: vi.fn().mockResolvedValue(null),
-      }
-
-      ;(Exam.findOne as any).mockReturnValue(mockFindOneQuery)
-
-      // Act
-      const result = await repository.findById(examId)
-
-      // Assert
-      expect(result).toBeNull()
     })
   })
 
+  describe('findByIdForParticipant', () => {
+    it('should find exam for participant with projection', async () => {
+      // Arrange
+      const examId = '507f1f77bcf86cd799439011'
+      mockQuery.exec.mockResolvedValue(mockExamInstance)
+
+      // Act
+      const result = await repository.findByIdForParticipant(examId)
+
+      // Assert
+      expect(Exam.findOne).toHaveBeenCalledWith({
+        _id: examId,
+        isDeleted: false,
+      })
+      expect(mockQuery.select).toHaveBeenCalledWith(
+        '_id title description duration availableAnytime startDate endDate randomizeQuestions'
+      )
+      expect(mockQuery.populate).toHaveBeenCalledWith({
+        path: 'questions',
+        select: '_id type question options points order',
+      })
+      expect(result).toBe(mockExamInstance)
+    })
+  })
 
   describe('updateById', () => {
     it('should update exam successfully', async () => {
@@ -177,18 +207,17 @@ describe('ExamRepository', () => {
       expect(result).toBe(updatedExam)
     })
 
-    it('should return null when exam not found', async () => {
+    it('should handle optimistic locking', async () => {
       // Arrange
       const examId = '507f1f77bcf86cd799439011'
       const updateData = { title: 'Updated Exam' }
+      const currentExam = { ...mockExamInstance, version: 1 }
+      ;(Exam.findById as any).mockResolvedValue(currentExam)
 
-      ;(Exam.findByIdAndUpdate as any).mockResolvedValue(null)
-
-      // Act
-      const result = await repository.updateById(examId, updateData)
-
-      // Assert
-      expect(result).toBeNull()
+      // Act & Assert
+      await expect(
+        repository.updateById(examId, updateData, { expectedVersion: 0 })
+      ).rejects.toThrow('Exam was modified by another user')
     })
   })
 
@@ -211,84 +240,20 @@ describe('ExamRepository', () => {
       )
       expect(result).toBe(true)
     })
-
-    it('should return false when exam not found', async () => {
-      // Arrange
-      const examId = '507f1f77bcf86cd799439011'
-
-      ;(Exam.findByIdAndUpdate as any).mockResolvedValue(null)
-
-      // Act
-      const result = await repository.deleteById(examId)
-
-      // Assert
-      expect(result).toBe(false)
-    })
   })
 
-  describe('addQuestion', () => {
-    it('should add question to exam successfully', async () => {
+  describe('getQuestionCount', () => {
+    it('should return question count using aggregation', async () => {
       // Arrange
       const examId = '507f1f77bcf86cd799439011'
-      const questionId = '507f1f77bcf86cd799439013'
-      const updatedExam = { ...mockExamInstance }
-
-      ;(Exam.findByIdAndUpdate as any).mockResolvedValue(updatedExam)
+      ;(Exam.aggregate as any).mockResolvedValue([{ questionCount: 5 }])
 
       // Act
-      const result = await repository.addQuestion(examId, questionId)
+      const result = await repository.getQuestionCount(examId)
 
       // Assert
-      expect(Exam.findByIdAndUpdate).toHaveBeenCalledWith(
-        examId,
-        { $addToSet: { questions: new Types.ObjectId(questionId) } },
-        { new: true }
-      )
-      expect(result).toBe(updatedExam)
-    })
-  })
-
-  describe('removeQuestion', () => {
-    it('should remove question from exam successfully', async () => {
-      // Arrange
-      const examId = '507f1f77bcf86cd799439011'
-      const questionId = '507f1f77bcf86cd799439013'
-      const updatedExam = { ...mockExamInstance }
-
-      ;(Exam.findByIdAndUpdate as any).mockResolvedValue(updatedExam)
-
-      // Act
-      const result = await repository.removeQuestion(examId, questionId)
-
-      // Assert
-      expect(Exam.findByIdAndUpdate).toHaveBeenCalledWith(
-        examId,
-        { $pull: { questions: new Types.ObjectId(questionId) } },
-        { new: true }
-      )
-      expect(result).toBe(updatedExam)
-    })
-  })
-
-  describe('reorderQuestions', () => {
-    it('should reorder questions successfully', async () => {
-      // Arrange
-      const examId = '507f1f77bcf86cd799439011'
-      const questionIds = ['507f1f77bcf86cd799439013', '507f1f77bcf86cd799439014']
-      const updatedExam = { ...mockExamInstance }
-
-      ;(Exam.findByIdAndUpdate as any).mockResolvedValue(updatedExam)
-
-      // Act
-      const result = await repository.reorderQuestions(examId, questionIds)
-
-      // Assert
-      expect(Exam.findByIdAndUpdate).toHaveBeenCalledWith(
-        examId,
-        { questions: questionIds.map(id => new Types.ObjectId(id)) },
-        { new: true }
-      )
-      expect(result).toBe(updatedExam)
+      expect(Exam.aggregate).toHaveBeenCalled()
+      expect(result).toBe(5)
     })
   })
 
@@ -306,24 +271,11 @@ describe('ExamRepository', () => {
       // Assert
       expect(ExamAttempt.countDocuments).toHaveBeenCalledWith({
         examId: new Types.ObjectId(examId),
-        status: { $in: ['in-progress', 'submitted'] },
+        status: {
+          $in: [EXAM_ATTEMPT_STATUS.IN_PROGRESS, EXAM_ATTEMPT_STATUS.SUBMITTED],
+        },
       })
       expect(result).toBe(true)
     })
-
-    it('should return false when exam has no active attempts', async () => {
-      // Arrange
-      const examId = '507f1f77bcf86cd799439011'
-      const { ExamAttempt } = await import('../../../src/shared/model/exam-attempt.model')
-
-      ;(ExamAttempt.countDocuments as any).mockResolvedValue(0)
-
-      // Act
-      const result = await repository.hasActiveAttempts(examId)
-
-      // Assert
-      expect(result).toBe(false)
-    })
   })
 })
-

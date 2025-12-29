@@ -1,8 +1,9 @@
 import { injectable, inject } from 'tsyringe'
 import { Request, Response, NextFunction } from 'express'
-import { ResponseUtil } from '../../../shared/util/response'
+import { ResponseUtil } from '../../../shared/util'
 import { HTTP_STATUS } from '../../../shared/constants'
 import { logger } from '../../../shared/util/logger'
+import { IExamCacheService } from '../cache'
 import {
   IQuestionService,
   AddQuestionInput,
@@ -19,7 +20,9 @@ import {
 export class QuestionController implements IQuestionController {
   constructor(
     @inject('IQuestionService')
-    private readonly questionService: IQuestionService
+    private readonly questionService: IQuestionService,
+    @inject('IExamCacheService')
+    private readonly examCache: IExamCacheService
   ) {
     logger.debug('QuestionController initialized')
   }
@@ -44,6 +47,9 @@ export class QuestionController implements IQuestionController {
         input,
         req.user.userId
       )
+
+      // Invalidate cache for exam detail
+      await this.examCache.invalidateExam(input.examId)
 
       ResponseUtil.created(res, result, {
         message: 'Question added successfully',
@@ -74,6 +80,9 @@ export class QuestionController implements IQuestionController {
         req.user.userId
       )
 
+      // Invalidate cache for exam detail
+      await this.examCache.invalidateExam(input.examId)
+
       ResponseUtil.success(res, result, HTTP_STATUS.OK, {
         message: 'Question updated successfully',
       })
@@ -98,6 +107,9 @@ export class QuestionController implements IQuestionController {
         input,
         req.user.userId
       )
+
+      // Invalidate cache for exam detail
+      await this.examCache.invalidateExam(input.examId)
 
       ResponseUtil.success(res, result, HTTP_STATUS.OK, {
         message: 'Question deleted successfully',

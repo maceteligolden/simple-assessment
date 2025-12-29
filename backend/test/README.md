@@ -11,14 +11,30 @@ test/
 ├── setup.ts                          # Global test setup
 ├── modules/
 │   ├── auth/
-│   │   └── auth.service.test.ts      # Auth service tests
+│   │   └── auth.service.test.ts      # Auth service unit tests
 │   └── exam/
 │       └── validation/
 │           └── exam.validation.test.ts
-└── shared/
-    └── util/
-        ├── password.test.ts          # Password utility tests
-        └── jwt.test.ts               # JWT utility tests
+├── shared/
+│   └── util/
+│       ├── password.test.ts          # Password utility tests
+│       └── jwt.test.ts               # JWT utility tests
+├── integration/                      # Integration tests
+│   └── modules/
+│       ├── auth/
+│       └── exam/
+└── load-tests/                       # Load/stress tests (k6)
+    ├── k6.config.ts                  # k6 configuration
+    ├── modules/
+    │   ├── auth/                     # Auth endpoint load tests
+    │   │   ├── signup.load.test.ts
+    │   │   ├── signin.load.test.ts
+    │   │   ├── refresh-token.load.test.ts
+    │   │   ├── profile.load.test.ts
+    │   │   ├── signout.load.test.ts
+    │   │   └── search-users.load.test.ts
+    │   └── exam/                     # Exam endpoint load tests
+    └── scenarios/                    # Full application scenarios
 ```
 
 ## Running Tests

@@ -7,14 +7,7 @@ import {
 import { logger } from '../util/logger'
 import { Types, ClientSession } from 'mongoose'
 import { EXAM_ATTEMPT_STATUS } from '../constants'
-
-/**
- * Repository options for operations that support transactions and optimistic locking
- */
-export interface RepositoryOptions {
-  session?: ClientSession
-  expectedVersion?: number // For optimistic locking - expected version of the document
-}
+import { RepositoryOptions } from '../interfaces'
 
 /**
  * Exam Attempt Repository Interface
@@ -179,7 +172,7 @@ export class ExamAttemptRepository implements IExamAttemptRepository {
         updateOptions.session = options.session
       }
       
-      const attempt = await ExamAttempt.findByIdAndUpdate(id, data, updateOptions)
+      const attempt = await ExamAttempt.findByIdAndUpdate(id, data, updateOptions) as IExamAttempt | null
       return attempt
     } catch (error) {
       logger.error('Error updating exam attempt in repository', error)
@@ -205,7 +198,11 @@ export class ExamAttemptRepository implements IExamAttemptRepository {
         findOptions.session = options.session
       }
       
-      const attempt = await ExamAttempt.findById(attemptId, null, findOptions)
+      const attempt = (await ExamAttempt.findById(
+        attemptId,
+        null,
+        findOptions
+      )) as IExamAttempt | null
       if (!attempt) {
         return null
       }
@@ -281,11 +278,11 @@ export class ExamAttemptRepository implements IExamAttemptRepository {
         updateOptions.session = options.session
       }
       
-      const attempt = await ExamAttempt.findByIdAndUpdate(
+      const attempt = (await ExamAttempt.findByIdAndUpdate(
         id,
         { lastActivityAt: new Date() },
         updateOptions
-      )
+      )) as IExamAttempt | null
       return attempt
     } catch (error) {
       logger.error('Error updating exam attempt activity in repository', error)
@@ -293,14 +290,21 @@ export class ExamAttemptRepository implements IExamAttemptRepository {
     }
   }
 
-  async findByUserId(userId: string): Promise<IExamAttempt[]> {
+  async findByUserId(userId: string, options?: RepositoryOptions): Promise<IExamAttempt[]> {
     try {
       logger.debug('Finding exam attempts by user ID in repository', { userId })
-      const attempts = await ExamAttempt.find({
+      const query = ExamAttempt.find({
         userId: new Types.ObjectId(userId),
       })
-        .populate('examId')
+        .select('_id examId score maxScore percentage submittedAt status')
+        .populate('examId', '_id title passPercentage')
         .sort({ createdAt: -1 })
+      
+      if (options?.session) {
+        query.session(options.session)
+      }
+      
+      const attempts = await query
       return attempts
     } catch (error) {
       logger.error(

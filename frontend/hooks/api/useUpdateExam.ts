@@ -25,7 +25,8 @@ export function useUpdateExam(onSuccess?: () => void) {
             startDate: examData.startDate,
             endDate: examData.endDate,
             randomizeQuestions: examData.randomizeQuestions,
-            showResultsImmediately: false, // Default value
+            showResultsImmediately: examData.showResultsImmediately,
+            passPercentage: examData.passPercentage,
           },
         })
 
@@ -36,6 +37,8 @@ export function useUpdateExam(onSuccess?: () => void) {
           duration: examData.timeLimit,
           availableAnytime: examData.availableAnytime,
           randomizeQuestions: examData.randomizeQuestions,
+          showResultsImmediately: examData.showResultsImmediately,
+          passPercentage: examData.passPercentage,
         }
 
         // Include version for optimistic locking if provided

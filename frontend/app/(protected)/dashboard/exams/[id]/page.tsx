@@ -445,8 +445,6 @@ export default function ExamDetailPage() {
                     <tr className="border-b">
                       <th className="text-left p-2">Email</th>
                       <th className="text-left p-2">Access Code</th>
-                      <th className="text-left p-2">Status</th>
-                      <th className="text-left p-2">Score</th>
                       <th className="text-left p-2">Actions</th>
                     </tr>
                   </thead>
@@ -469,35 +467,6 @@ export default function ExamDetailPage() {
                               <Copy className="h-4 w-4" />
                             </Button>
                           </div>
-                        </td>
-                        <td className="p-2">
-                          {participant.hasCompleted ? (
-                            <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                              <CheckCircle2 className="h-4 w-4" />
-                              Completed
-                            </span>
-                          ) : participant.hasStarted ? (
-                            <span className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
-                              <Clock className="h-4 w-4" />
-                              In Progress
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1 text-gray-500">
-                              <XCircle className="h-4 w-4" />
-                              Not Started
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-2">
-                          {participant.hasCompleted &&
-                          participant.score !== undefined ? (
-                            <span>
-                              {participant.score} /{' '}
-                              {participant.maxScore || totalScore}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
                         </td>
                         <td className="p-2">
                           <div className="flex gap-2">

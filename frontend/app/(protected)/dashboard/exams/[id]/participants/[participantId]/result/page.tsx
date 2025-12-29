@@ -22,6 +22,12 @@ export default function ParticipantResultPage() {
   )
 
   useEffect(() => {
+    if (result) {
+      console.log('Participant result response:', result)
+    }
+  }, [result])
+
+  useEffect(() => {
     if (!BYPASS_AUTH && !isAuthenticated) {
       router.push('/')
     }

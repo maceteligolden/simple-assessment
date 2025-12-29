@@ -6,6 +6,7 @@ import {
   IQuestionRepository,
   IUserRepository,
 } from '../../../shared/repository'
+import { IParticipantCacheService } from '../cache'
 import { QuestionFactory } from '../factory/question.factory'
 import {
   logger,
@@ -55,7 +56,9 @@ export class ExamParticipantService implements IExamParticipantService {
     @inject('IQuestionRepository')
     private readonly questionRepository: IQuestionRepository,
     @inject('IUserRepository')
-    private readonly userRepository: IUserRepository
+    private readonly userRepository: IUserRepository,
+    @inject('IParticipantCacheService')
+    private readonly participantCache: IParticipantCacheService
   ) {
     logger.debug('ExamParticipantService initialized')
   }
@@ -127,6 +130,11 @@ export class ExamParticipantService implements IExamParticipantService {
         accessCode: participant.accessCode,
       })
 
+      // Invalidate caches
+      await this.participantCache.invalidateParticipants(data.examId)
+      await this.participantCache.invalidateMyExams(participant.userId.toString())
+      await this.participantCache.invalidateNotStartedExams(participant.userId.toString())
+
       return {
         id: participant._id.toString(),
         email: participant.email,
@@ -193,6 +201,11 @@ export class ExamParticipantService implements IExamParticipantService {
         participantId: participant._id.toString(),
       })
 
+      // Invalidate caches
+      await this.participantCache.invalidateParticipants(participant.examId.toString())
+      await this.participantCache.invalidateMyExams(participant.userId.toString())
+      await this.participantCache.invalidateNotStartedExams(participant.userId.toString())
+
       return {
         message: 'Participant removed successfully',
       }
@@ -210,108 +223,115 @@ export class ExamParticipantService implements IExamParticipantService {
     userId: string
   ): Promise<ListParticipantsOutput> {
     try {
-      logger.info('Listing participants for exam', {
-        examId: data.examId,
-        userId,
-      })
-
-      const exam = await this.examRepository.findById(data.examId)
-
-      if (!exam) {
-        throw new NotFoundError('Exam not found')
-      }
-
-      // Check if user is the creator
-      if (exam.creatorId.toString() !== userId) {
-        throw new ForbiddenError(
-          'You do not have permission to view participants for this exam'
-        )
-      }
-
-      // Get all participants for the exam
-      const participants = await this.participantRepository.findByExamId(
-        exam._id.toString()
-      )
-
-      // Use pagination and search from input
       const { pagination: paginationParams, search: searchQuery } = data
       const search = searchQuery?.toLowerCase().trim()
 
-      // Filter by search if provided
-      let filteredParticipants = participants
-      if (search) {
-        filteredParticipants = participants.filter((p: { email: string }) =>
-          p.email.toLowerCase().includes(search)
-        )
-      }
+      return this.participantCache.wrapParticipants(
+        data.examId,
+        paginationParams.page,
+        paginationParams.limit,
+        search,
+        async () => {
+          logger.debug('Fetching participants from DB (cache miss)', {
+            examId: data.examId,
+            userId,
+          })
 
-      // Paginate the filtered participants
-      const paginatedResult = paginateArray(
-        filteredParticipants,
-        paginationParams
-      )
-      const paginatedParticipants = paginatedResult.data
+          const exam = await this.examRepository.findById(data.examId)
 
-      // Get attempt information for each participant
-      const participantsWithAttempts = await Promise.all(
-        paginatedParticipants.map(async (participant: IExamParticipant) => {
-          const attempt = await this.attemptRepository.findByParticipant(
-            participant._id.toString()
+          if (!exam) {
+            throw new NotFoundError('Exam not found')
+          }
+
+          // Check if user is the creator
+          if (exam.creatorId.toString() !== userId) {
+            throw new ForbiddenError(
+              'You do not have permission to view participants for this exam'
+            )
+          }
+
+          // Get all participants for the exam
+          const participants = await this.participantRepository.findByExamId(
+            exam._id.toString()
           )
 
-          let attemptStatus: (typeof PARTICIPANT_ATTEMPT_STATUS)[keyof typeof PARTICIPANT_ATTEMPT_STATUS] =
-            PARTICIPANT_ATTEMPT_STATUS.NOT_STARTED
-          let score: number | undefined
-          let maxScore: number | undefined
-          let percentage: number | undefined
-          let startedAt: string | undefined
-          let submittedAt: string | undefined
-
-          if (attempt) {
-            // Map attempt.status to attemptStatus using the mapping function
-            attemptStatus = mapAttemptStatusToParticipantStatus(
-              attempt.status as ExamAttemptStatus
+          // Filter by search if provided
+          let filteredParticipants = participants
+          if (search) {
+            filteredParticipants = participants.filter((p: { email: string }) =>
+              p.email.toLowerCase().includes(search)
             )
-            if (attempt.status === EXAM_ATTEMPT_STATUS.SUBMITTED) {
-              score = attempt.score
-              maxScore = attempt.maxScore
-              percentage = attempt.percentage
-            }
-
-            if (attempt.startedAt) {
-              startedAt = attempt.startedAt.toISOString()
-            }
-            if (attempt.submittedAt) {
-              submittedAt = attempt.submittedAt.toISOString()
-            }
           }
+
+          // Paginate the filtered participants
+          const paginatedResult = paginateArray(
+            filteredParticipants,
+            paginationParams
+          )
+          const paginatedParticipants = paginatedResult.data
+
+          // Get attempt information for each participant
+          const participantsWithAttempts = await Promise.all(
+            paginatedParticipants.map(async (participant: IExamParticipant) => {
+              const attempt = await this.attemptRepository.findByParticipant(
+                participant._id.toString()
+              )
+
+              let attemptStatus: (typeof PARTICIPANT_ATTEMPT_STATUS)[keyof typeof PARTICIPANT_ATTEMPT_STATUS] =
+                PARTICIPANT_ATTEMPT_STATUS.NOT_STARTED
+              let score: number | undefined
+              let maxScore: number | undefined
+              let percentage: number | undefined
+              let startedAt: string | undefined
+              let submittedAt: string | undefined
+
+              if (attempt) {
+                // Map attempt.status to attemptStatus using the mapping function
+                attemptStatus = mapAttemptStatusToParticipantStatus(
+                  attempt.status as ExamAttemptStatus
+                )
+                if (attempt.status === EXAM_ATTEMPT_STATUS.SUBMITTED) {
+                  score = attempt.score
+                  maxScore = attempt.maxScore
+                  percentage = attempt.percentage
+                }
+
+                if (attempt.startedAt) {
+                  startedAt = attempt.startedAt.toISOString()
+                }
+                if (attempt.submittedAt) {
+                  submittedAt = attempt.submittedAt.toISOString()
+                }
+              }
+
+              return {
+                id: participant._id.toString(),
+                email: participant.email,
+                accessCode: participant.accessCode,
+                isUsed: participant.isUsed,
+                addedAt: participant.addedAt.toISOString(),
+                status: attemptStatus,
+                score,
+                maxScore,
+                percentage,
+                startedAt,
+                submittedAt,
+              }
+            })
+          )
+
+          // Recalculate pagination metadata with the final data
+          const finalPagination = createPaginationMetadata(
+            filteredParticipants.length,
+            paginationParams
+          )
 
           return {
-            id: participant._id.toString(),
-            email: participant.email,
-            accessCode: participant.accessCode,
-            isUsed: participant.isUsed,
-            addedAt: participant.addedAt.toISOString(),
-            attemptStatus,
-            score,
-            maxScore,
-            percentage,
-            startedAt,
-            submittedAt,
+            data: participantsWithAttempts,
+            pagination: finalPagination,
           }
-        })
+        }
       )
-
-      // Recalculate pagination metadata with the final data
-      const finalPagination = createPaginationMetadata(
-        filteredParticipants.length,
-        paginationParams
-      )
-
-      return {
-        data: participantsWithAttempts,
-        pagination: finalPagination,
-      }
     } catch (error) {
       logger.error('Error listing participants', error)
       throw error
@@ -326,133 +346,204 @@ export class ExamParticipantService implements IExamParticipantService {
     userId: string
   ): Promise<GetParticipantResultOutput> {
     try {
-      logger.info('Getting participant result', {
-        examId: data.examId,
-        participantId: data.participantId,
-        userId,
-      })
-
-      const exam = await this.examRepository.findById(data.examId)
-
-      if (!exam) {
-        throw new NotFoundError('Exam not found')
-      }
-
-      // Check if user is the creator
-      if (exam.creatorId.toString() !== userId) {
-        throw new ForbiddenError(
-          'You do not have permission to view participant results for this exam'
-        )
-      }
-
-      const participant = await this.participantRepository.findById(
-        data.participantId
-      )
-
-      if (!participant) {
-        throw new NotFoundError('Participant not found')
-      }
-
-      // Verify participant belongs to exam
-      if (participant.examId.toString() !== exam._id.toString()) {
-        throw new BadRequestError('Participant does not belong to this exam')
-      }
-
-      // Get attempt if exists
-      const attempt = await this.attemptRepository.findByParticipant(
-        participant._id.toString()
-      )
-
-      const result: GetParticipantResultOutput = {
-        participant: {
-          id: participant._id.toString(),
-          email: participant.email,
-          accessCode: participant.accessCode,
-          addedAt: participant.addedAt.toISOString(),
-        },
-      }
-
-      if (attempt && attempt.status === EXAM_ATTEMPT_STATUS.SUBMITTED) {
-        // Get questions for the exam to build answer details
-        const questions = await this.questionRepository.findByExamId(
-          exam._id.toString()
-        )
-
-        // Build answer details using QuestionFactory
-        const answers = await Promise.all(
-          questions.map(async (question: IQuestion) => {
-            const answerData = attempt.answers.get(question._id.toString())
-            const questionHandler = QuestionFactory.create(question.type)
-
-            // Mark the answer with options to handle index-based answers
-            const earnedPoints = answerData
-              ? questionHandler.markAnswer(
-                  answerData.answer,
-                  question.correctAnswer,
-                  question.points,
-                  question.options // Pass options for index-based answer conversion
-                )
-              : 0
-
-            // Convert user answer from index to text if needed (for display)
-            let displayUserAnswer: string | string[]
-            if (answerData?.answer) {
-              const answerStr = String(answerData.answer).trim()
-              const answerIndex = parseInt(answerStr, 10)
-              const isIndexAnswer =
-                !isNaN(answerIndex) &&
-                answerIndex.toString() === answerStr &&
-                /^\d+$/.test(answerStr)
-
-              if (
-                isIndexAnswer &&
-                question.options &&
-                question.options.length > 0
-              ) {
-                // Convert index to option text
-                if (answerIndex >= 0 && answerIndex < question.options.length) {
-                  displayUserAnswer = question.options[answerIndex]
-                } else {
-                  displayUserAnswer = answerStr // Fallback to index if out of range
-                }
-              } else {
-                // Already text, use as-is
-                displayUserAnswer = answerStr
-              }
-            } else {
-              displayUserAnswer = 'Not answered'
-            }
-
-            const questionText =
-              typeof question.question === 'string'
-                ? question.question
-                : (question.question as { text?: string })?.text || ''
-
-            return {
-              questionId: question._id.toString(),
-              question: questionText,
-              userAnswer: displayUserAnswer, // Use converted text instead of index
-              correctAnswer: question.correctAnswer as string | string[],
-              isCorrect: earnedPoints === question.points,
-              points: question.points,
-              earnedPoints,
-            }
+      return this.participantCache.wrapParticipantResult(
+        data.examId,
+        data.participantId,
+        async () => {
+          logger.debug('Fetching participant result from DB (cache miss)', {
+            examId: data.examId,
+            participantId: data.participantId,
+            userId,
           })
-        )
 
-        result.attempt = {
-          attemptId: attempt._id.toString(),
-          status: attempt.status,
-          score: attempt.score || 0,
-          maxScore: attempt.maxScore || 0,
-          percentage: attempt.percentage || 0,
-          startedAt: attempt.startedAt?.toISOString() || '',
-          submittedAt: attempt.submittedAt?.toISOString(),
-          answers,
+          const exam = await this.examRepository.findById(data.examId)
+
+          if (!exam) {
+            throw new NotFoundError('Exam not found')
+          }
+
+          // Check if user is the creator
+          if (exam.creatorId.toString() !== userId) {
+            throw new ForbiddenError(
+              'You do not have permission to view participant results for this exam'
+            )
+          }
+
+          const participant = await this.participantRepository.findById(
+            data.participantId
+          )
+
+          if (!participant) {
+            throw new NotFoundError('Participant not found')
+          }
+
+          // Verify participant belongs to exam
+          if (participant.examId.toString() !== exam._id.toString()) {
+            throw new BadRequestError(
+              'Participant does not belong to this exam'
+            )
+          }
+
+          // Get attempt if exists
+          const attempt = await this.attemptRepository.findByParticipant(
+            participant._id.toString()
+          )
+
+          const result: GetParticipantResultOutput = {
+            participant: {
+              id: participant._id.toString(),
+              email: participant.email,
+              accessCode: participant.accessCode,
+              addedAt: participant.addedAt.toISOString(),
+            },
+          }
+
+          if (attempt && attempt.status === EXAM_ATTEMPT_STATUS.SUBMITTED) {
+            // Get questions for the exam with correct answers to build answer details
+            const questions = await this.questionRepository.findByExamIdWithCorrectAnswers(
+              exam._id.toString()
+            )
+
+            logger.debug('Fetched questions for participant results', {
+              count: questions.length,
+              attemptAnswersCount: attempt.answers.size,
+            })
+
+            // Build answer details using QuestionFactory
+            const answers = await Promise.all(
+              questions.map(async (question: IQuestion) => {
+                const answerData = attempt.answers.get(question._id.toString())
+                const questionHandler = QuestionFactory.create(question.type)
+
+                logger.debug('Processing participant question result', {
+                  questionId: question._id.toString(),
+                  hasUserAnswer: !!answerData,
+                  userAnswer: answerData?.answer,
+                  correctAnswer: question.correctAnswer,
+                })
+
+                // Mark the answer with options to handle index-based answers
+                const earnedPoints = answerData
+                  ? questionHandler.markAnswer(
+                      answerData.answer,
+                      question.correctAnswer,
+                      question.points,
+                      question.options // Pass options for index-based answer conversion
+                    )
+                  : 0
+
+                // Convert user answer from index to text if needed (for display)
+                let displayUserAnswer: string | string[]
+                if (answerData?.answer) {
+                  const answerStr = String(answerData.answer).trim()
+                  const answerIndex = parseInt(answerStr, 10)
+                  const isIndexAnswer =
+                    !isNaN(answerIndex) &&
+                    answerIndex.toString() === answerStr &&
+                    /^\d+$/.test(answerStr)
+
+                  if (
+                    isIndexAnswer &&
+                    question.options &&
+                    question.options.length > 0
+                  ) {
+                    // Convert index to option text
+                    if (
+                      answerIndex >= 0 &&
+                      answerIndex < question.options.length
+                    ) {
+                      displayUserAnswer = question.options[answerIndex]
+                    } else {
+                      displayUserAnswer = answerStr // Fallback to index if out of range
+                    }
+                  } else {
+                    // Already text, use as-is
+                    displayUserAnswer = answerStr
+                  }
+                } else {
+                  displayUserAnswer = 'Not answered'
+                }
+
+                const questionText =
+                  typeof question.question === 'string'
+                    ? question.question
+                    : (question.question as { text?: string })?.text || ''
+
+                // Normalize correctAnswer to match interface (string | string[]) and convert to text for display
+                let normalizedCorrectAnswer: string | string[]
+                const rawCorrectAnswer = question.correctAnswer
+                if (
+                  typeof rawCorrectAnswer === 'string' ||
+                  Array.isArray(rawCorrectAnswer)
+                ) {
+                  const correctAnswers = Array.isArray(rawCorrectAnswer)
+                    ? rawCorrectAnswer
+                    : [rawCorrectAnswer]
+
+                  const mappedCorrectAnswers = correctAnswers.map(ans => {
+                    const answerStr = String(ans).trim()
+                    const answerIndex = parseInt(answerStr, 10)
+                    const isIndexAnswer =
+                      !isNaN(answerIndex) &&
+                      answerIndex.toString() === answerStr &&
+                      /^\d+$/.test(answerStr)
+
+                    if (
+                      isIndexAnswer &&
+                      question.options &&
+                      question.options.length > 0 &&
+                      answerIndex >= 0 &&
+                      answerIndex < question.options.length
+                    ) {
+                      return question.options[answerIndex]
+                    }
+                    return answerStr
+                  })
+
+                  normalizedCorrectAnswer = Array.isArray(rawCorrectAnswer)
+                    ? mappedCorrectAnswers
+                    : mappedCorrectAnswers[0]
+                } else {
+                  normalizedCorrectAnswer = JSON.stringify(rawCorrectAnswer)
+                }
+
+                const resultDetail = {
+                  questionId: question._id.toString(),
+                  question: questionText,
+                  userAnswer: displayUserAnswer, // Use converted text instead of index
+                  correctAnswer: normalizedCorrectAnswer,
+                  isCorrect: earnedPoints === question.points,
+                  points: question.points,
+                  earnedPoints,
+                }
+
+                logger.debug('Built participant question result detail', {
+                  questionId: resultDetail.questionId,
+                  isCorrect: resultDetail.isCorrect,
+                  earnedPoints: resultDetail.earnedPoints,
+                  userAnswer: resultDetail.userAnswer,
+                  correctAnswer: resultDetail.correctAnswer,
+                })
+
+                return resultDetail
+              })
+            )
+
+            result.attempt = {
+              attemptId: attempt._id.toString(),
+              status: attempt.status,
+              score: attempt.score || 0,
+              maxScore: attempt.maxScore || 0,
+              percentage: attempt.percentage || 0,
+              startedAt: attempt.startedAt?.toISOString() || '',
+              submittedAt: attempt.submittedAt?.toISOString(),
+              answers,
+            }
+          }
+
+          return result
         }
-      }
-
-      return result
+      )
     } catch (error) {
       logger.error('Error getting participant result', error)
       throw error
@@ -467,12 +558,6 @@ export class ExamParticipantService implements IExamParticipantService {
     userId: string
   ): Promise<GetMyExamsOutput> {
     try {
-      logger.info('Getting participant exams', { userId })
-
-      // Get all participants for this user
-      const participants = await this.participantRepository.findByUserId(userId)
-
-      // Use pagination and filters from input
       const {
         pagination: paginationParams,
         status: statusFilter,
@@ -480,127 +565,144 @@ export class ExamParticipantService implements IExamParticipantService {
         isAvailable: isAvailableFilter,
       } = data
 
-      // Get exam and attempt details for each participant
-      const examsWithStatus = await Promise.all(
-        participants.map(async (participant: IExamParticipant) => {
-          // examId is an ObjectId (not populated), convert to string
-          const examIdString = String(participant.examId)
+      return this.participantCache.wrapMyExams(
+        userId,
+        paginationParams.page,
+        paginationParams.limit,
+        search,
+        statusFilter,
+        isAvailableFilter,
+        async () => {
+          logger.debug('Fetching my exams from DB (cache miss)', { userId })
 
-          const exam = await this.examRepository.findById(examIdString)
-
-          if (!exam) {
-            return null
-          }
-
-          // Check if exam is available
-          let isAvailable = true
-          if (!exam.availableAnytime) {
-            const now = new Date()
-            if (exam.startDate && now < exam.startDate) {
-              isAvailable = false
-            }
-            if (exam.endDate && now > exam.endDate) {
-              isAvailable = false
-            }
-          }
-
-          // Get attempt if exists
-          const attempt = await this.attemptRepository.findByParticipant(
-            participant._id.toString()
+          // Get all participants for this user
+          const participants = await this.participantRepository.findByUserId(
+            userId
           )
 
-          let attemptStatus: (typeof PARTICIPANT_ATTEMPT_STATUS)[keyof typeof PARTICIPANT_ATTEMPT_STATUS] =
-            PARTICIPANT_ATTEMPT_STATUS.NOT_STARTED
-          let attemptId: string | undefined
-          let score: number | undefined
-          let maxScore: number | undefined
-          let percentage: number | undefined
-          let startedAt: string | undefined
-          let submittedAt: string | undefined
+          // Get exam and attempt details for each participant
+          const examsWithStatus = await Promise.all(
+            participants.map(async (participant: IExamParticipant) => {
+              // examId is an ObjectId (not populated), convert to string
+              const examIdString = String(participant.examId)
 
-          if (attempt) {
-            attemptId = attempt._id.toString()
-            // Map attempt.status to attemptStatus using the mapping function
-            attemptStatus = mapAttemptStatusToParticipantStatus(
-              attempt.status as ExamAttemptStatus
+              const exam = await this.examRepository.findById(examIdString)
+
+              if (!exam) {
+                return null
+              }
+
+              // Check if exam is available
+              let isAvailable = true
+              if (!exam.availableAnytime) {
+                const now = new Date()
+                if (exam.startDate && now < exam.startDate) {
+                  isAvailable = false
+                }
+                if (exam.endDate && now > exam.endDate) {
+                  isAvailable = false
+                }
+              }
+
+              // Get attempt if exists
+              const attempt = await this.attemptRepository.findByParticipant(
+                participant._id.toString()
+              )
+
+              let attemptStatus: (typeof PARTICIPANT_ATTEMPT_STATUS)[keyof typeof PARTICIPANT_ATTEMPT_STATUS] =
+                PARTICIPANT_ATTEMPT_STATUS.NOT_STARTED
+              let attemptId: string | undefined
+              let score: number | undefined
+              let maxScore: number | undefined
+              let percentage: number | undefined
+              let startedAt: string | undefined
+              let submittedAt: string | undefined
+
+              if (attempt) {
+                attemptId = attempt._id.toString()
+                // Map attempt.status to attemptStatus using the mapping function
+                attemptStatus = mapAttemptStatusToParticipantStatus(
+                  attempt.status as ExamAttemptStatus
+                )
+                if (attempt.status === EXAM_ATTEMPT_STATUS.SUBMITTED) {
+                  score = attempt.score
+                  maxScore = attempt.maxScore
+                  percentage = attempt.percentage
+                }
+
+                if (attempt.startedAt) {
+                  startedAt = attempt.startedAt.toISOString()
+                }
+                if (attempt.submittedAt) {
+                  submittedAt = attempt.submittedAt.toISOString()
+                }
+              }
+
+              // Get question count
+              const questions = await this.questionRepository.findByExamId(
+                exam._id.toString()
+              )
+
+              return {
+                examId: exam._id.toString(),
+                participantId: participant._id.toString(),
+                title: exam.title,
+                description: exam.description,
+                duration: exam.duration || 0,
+                questionCount: questions.length,
+                accessCode: participant.accessCode,
+                addedAt: participant.addedAt.toISOString(),
+                attemptStatus,
+                attemptId,
+                score,
+                maxScore,
+                percentage,
+                startedAt,
+                submittedAt,
+                isAvailable,
+              }
+            })
+          )
+
+          // Filter out null values and apply filters
+          let filteredExams = examsWithStatus.filter(
+            (exam: (typeof examsWithStatus)[0]) => exam !== null
+          ) as NonNullable<(typeof examsWithStatus)[0]>[]
+
+          // Apply status filter
+          if (statusFilter) {
+            filteredExams = filteredExams.filter(
+              exam => exam.attemptStatus === statusFilter
             )
-            if (attempt.status === EXAM_ATTEMPT_STATUS.SUBMITTED) {
-              score = attempt.score
-              maxScore = attempt.maxScore
-              percentage = attempt.percentage
-            }
-
-            if (attempt.startedAt) {
-              startedAt = attempt.startedAt.toISOString()
-            }
-            if (attempt.submittedAt) {
-              submittedAt = attempt.submittedAt.toISOString()
-            }
           }
 
-          // Get question count
-          const questions = await this.questionRepository.findByExamId(
-            exam._id.toString()
-          )
+          // Apply availability filter
+          if (isAvailableFilter !== undefined) {
+            filteredExams = filteredExams.filter(
+              exam => exam.isAvailable === isAvailableFilter
+            )
+          }
+
+          // Apply search filter
+          if (search && search.trim()) {
+            const searchLower = search.trim().toLowerCase()
+            filteredExams = filteredExams.filter(
+              exam =>
+                exam.title.toLowerCase().includes(searchLower) ||
+                (exam.description &&
+                  exam.description.toLowerCase().includes(searchLower))
+            )
+          }
+
+          // Paginate the results
+          const paginatedResult = paginateArray(filteredExams, paginationParams)
 
           return {
-            examId: exam._id.toString(),
-            participantId: participant._id.toString(),
-            title: exam.title,
-            description: exam.description,
-            duration: exam.duration || 0,
-            questionCount: questions.length,
-            accessCode: participant.accessCode,
-            addedAt: participant.addedAt.toISOString(),
-            attemptStatus,
-            attemptId,
-            score,
-            maxScore,
-            percentage,
-            startedAt,
-            submittedAt,
-            isAvailable,
+            data: paginatedResult.data,
+            pagination: paginatedResult.pagination,
           }
-        })
+        }
       )
-
-      // Filter out null values and apply filters
-      let filteredExams = examsWithStatus.filter(
-        (exam: (typeof examsWithStatus)[0]) => exam !== null
-      ) as NonNullable<(typeof examsWithStatus)[0]>[]
-
-      // Apply status filter
-      if (statusFilter) {
-        filteredExams = filteredExams.filter(
-          exam => exam.attemptStatus === statusFilter
-        )
-      }
-
-      // Apply availability filter
-      if (isAvailableFilter !== undefined) {
-        filteredExams = filteredExams.filter(
-          exam => exam.isAvailable === isAvailableFilter
-        )
-      }
-
-      // Apply search filter
-      if (search && search.trim()) {
-        const searchLower = search.trim().toLowerCase()
-        filteredExams = filteredExams.filter(
-          exam =>
-            exam.title.toLowerCase().includes(searchLower) ||
-            (exam.description &&
-              exam.description.toLowerCase().includes(searchLower))
-        )
-      }
-
-      // Paginate the results
-      const paginatedResult = paginateArray(filteredExams, paginationParams)
-
-      return {
-        data: paginatedResult.data,
-        pagination: paginatedResult.pagination,
-      }
     } catch (error) {
       logger.error('Error getting participant exams', error)
       throw error

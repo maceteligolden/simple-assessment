@@ -4,8 +4,9 @@ import {
   IQuestionRepository,
   IExamParticipantRepository,
 } from '../../../shared/repository'
+import { IExamCacheService } from '../cache'
 import { QuestionFactory } from '../factory/question.factory'
-import { logger, paginateArray } from '../../../shared/util'
+import { logger, paginateArray, Sanitizer } from '../../../shared/util'
 import { EXAM_ATTEMPT_STATUS } from '../../../shared/constants'
 import {
   CreateExamInput,
@@ -51,7 +52,9 @@ export class ExamService implements IExamService {
     @inject('IQuestionRepository')
     private readonly questionRepository: IQuestionRepository,
     @inject('IExamParticipantRepository')
-    private readonly participantRepository: IExamParticipantRepository
+    private readonly participantRepository: IExamParticipantRepository,
+    @inject('IExamCacheService')
+    private readonly examCache: IExamCacheService
   ) {
     logger.debug('ExamService initialized')
   }
@@ -94,8 +97,15 @@ export class ExamService implements IExamService {
         },
       })
 
-      const exam = await this.examRepository.create({
+      // Sanitize input data
+      const sanitizedData = {
         ...data,
+        title: Sanitizer.sanitize(data.title),
+        description: data.description ? Sanitizer.sanitize(data.description) : undefined,
+      }
+
+      const exam = await this.examRepository.create({
+        ...sanitizedData,
         creatorId: userId,
         startDate: data.startDate ? new Date(data.startDate) : undefined,
         endDate: data.endDate ? new Date(data.endDate) : undefined,
@@ -163,6 +173,9 @@ export class ExamService implements IExamService {
         throw new Error('Response data contains invalid exam ID')
       }
 
+      // Invalidate cache for exam list (since a new exam was added)
+      await this.examCache.invalidateExamList(userId)
+
       return responseData
     } catch (error) {
       logger.error('[Create Exam Service] Error creating exam', {
@@ -183,45 +196,49 @@ export class ExamService implements IExamService {
     userId: string
   ): Promise<ListExamsOutput> {
     try {
-      logger.debug('Listing exams', { userId })
-
-      // Use pagination from input
       const { pagination, search, isActive } = data
 
-      const exams = await this.examRepository.findByCreatorId(userId, {
+      return this.examCache.wrapExamList(
+        userId,
+        pagination.page,
+        pagination.limit,
         search,
-        isActive,
-      })
+        async () => {
+          logger.debug('Fetching exams from DB (cache miss)', { userId })
+          const exams = await this.examRepository.findByCreatorId(userId, {
+            search,
+            isActive,
+          })
 
-      // Get question and participant counts
-      const examsWithCounts = await Promise.all(
-        exams.map(async (exam: IExam) => {
-          const questions = await this.questionRepository.findByExamId(
-            exam._id.toString()
+          // Get question and participant counts efficiently (using aggregation)
+          const examsWithCounts = await Promise.all(
+            exams.map(async (exam: IExam) => {
+              const [questionCount, participantCount] = await Promise.all([
+                this.examRepository.getQuestionCount(exam._id.toString()),
+                this.examRepository.getParticipantCount(exam._id.toString()),
+              ])
+
+              return {
+                id: exam._id.toString(),
+                title: exam.title,
+                description: exam.description,
+                duration: exam.duration,
+                questionCount,
+                participantCount,
+                createdAt: exam.createdAt.toISOString(),
+              }
+            })
           )
-          const participants = await this.participantRepository.findByExamId(
-            exam._id.toString()
-          )
+
+          // Paginate the results
+          const paginatedResult = paginateArray(examsWithCounts, pagination)
 
           return {
-            id: exam._id.toString(),
-            title: exam.title,
-            description: exam.description,
-            duration: exam.duration,
-            questionCount: questions.length,
-            participantCount: participants.length,
-            createdAt: exam.createdAt.toISOString(),
+            data: paginatedResult.data,
+            pagination: paginatedResult.pagination,
           }
-        })
+        }
       )
-
-      // Paginate the results
-      const paginatedResult = paginateArray(examsWithCounts, pagination)
-
-      return {
-        data: paginatedResult.data,
-        pagination: paginatedResult.pagination,
-      }
     } catch (error) {
       logger.error('Error listing exams', error)
       throw error
@@ -233,71 +250,71 @@ export class ExamService implements IExamService {
    */
   async getExam(data: GetExamInput, userId: string): Promise<GetExamOutput> {
     try {
-      logger.debug('Getting exam', { examId: data.examId, userId })
-
-      const exam = await this.examRepository.findById(data.examId)
-
-      if (!exam) {
-        throw new NotFoundError('Exam not found')
-      }
-
-      // Check if user is the creator
-      // Compare both as strings to ensure proper comparison
-      const creatorIdStr = exam.creatorId.toString()
-      const userIdStr = userId.toString()
-      
-      if (creatorIdStr !== userIdStr) {
-        logger.warn('Access denied: User is not the exam creator', {
+      return this.examCache.wrapExamDetail(data.examId, async () => {
+        logger.debug('Fetching exam from DB (cache miss)', {
           examId: data.examId,
-          creatorId: creatorIdStr,
-          userId: userIdStr,
+          userId,
         })
-        throw new ForbiddenError('You do not have permission to view this exam')
-      }
 
-      // Get questions
-      const questions = await this.questionRepository.findByExamId(
-        exam._id.toString()
-      )
+        const exam = await this.examRepository.findByIdForExaminer(data.examId)
 
-      // Get participants
-      const participants = await this.participantRepository.findByExamId(
-        exam._id.toString()
-      )
+        if (!exam) {
+          throw new NotFoundError('Exam not found')
+        }
 
-      return {
-        id: exam._id.toString(),
-        creatorId: creatorIdStr, // Include creatorId in response for frontend
-        title: exam.title,
-        description: exam.description,
-        duration: exam.duration,
-        availableAnytime: exam.availableAnytime,
-        startDate: exam.startDate?.toISOString(),
-        endDate: exam.endDate?.toISOString(),
-        randomizeQuestions: exam.randomizeQuestions,
-        showResultsImmediately: exam.showResultsImmediately,
-        passPercentage: exam.passPercentage,
-        version: exam.version, // Include version for optimistic locking
-        questions: questions.map((q: IQuestion) => {
-          // Use factory to render question (excludes sensitive data)
-          const questionHandler = QuestionFactory.create(q.type)
-          const rendered = questionHandler.render(q)
-          // Add version for optimistic locking
-          return {
-            ...rendered,
-            version: q.version,
-          }
-        }),
-        participants: participants.map((p: IExamParticipant) => ({
-          id: p._id.toString(),
-          email: p.email,
-          accessCode: p.accessCode,
-          isUsed: p.isUsed,
-          addedAt: p.addedAt.toISOString(),
-        })),
-        createdAt: exam.createdAt.toISOString(),
-        updatedAt: exam.updatedAt.toISOString(),
-      }
+        // Check if user is the creator
+        const creatorIdStr = exam.creatorId.toString()
+        const userIdStr = userId.toString()
+
+        if (creatorIdStr !== userIdStr) {
+          logger.warn('Access denied: User is not the exam creator', {
+            examId: data.examId,
+            creatorId: creatorIdStr,
+            userId: userIdStr,
+          })
+          throw new ForbiddenError(
+            'You do not have permission to view this exam'
+          )
+        }
+
+        // Questions are populated, participants need to be fetched separately
+        const questions = (exam.questions as unknown as IQuestion[]) || []
+        const participants = await this.participantRepository.findByExamId(
+          data.examId
+        )
+
+        return {
+          id: exam._id.toString(),
+          creatorId: creatorIdStr,
+          title: exam.title,
+          description: exam.description,
+          duration: exam.duration,
+          availableAnytime: exam.availableAnytime,
+          startDate: exam.startDate?.toISOString(),
+          endDate: exam.endDate?.toISOString(),
+          randomizeQuestions: exam.randomizeQuestions,
+          showResultsImmediately: exam.showResultsImmediately,
+          passPercentage: exam.passPercentage,
+          version: exam.version,
+          questions: questions.map((q: IQuestion) => {
+            const questionHandler = QuestionFactory.create(q.type)
+            const rendered = questionHandler.render(q)
+            return {
+              ...rendered,
+              version: q.version,
+            }
+          }),
+          participants: participants.map((p: IExamParticipant) => ({
+            id: p._id.toString(),
+            email: p.email,
+            accessCode: p.accessCode,
+            isUsed: p.isUsed,
+            addedAt: p.addedAt.toISOString(),
+          })),
+          createdAt: exam.createdAt.toISOString(),
+          updatedAt: exam.updatedAt.toISOString(),
+        }
+      })
     } catch (error) {
       logger.error('Error getting exam', error)
       throw error
@@ -334,9 +351,9 @@ export class ExamService implements IExamService {
 
       // Prepare update data
       const updateData: Partial<IExam> = {}
-      if (data.title !== undefined) updateData.title = data.title
+      if (data.title !== undefined) updateData.title = Sanitizer.sanitize(data.title)
       if (data.description !== undefined)
-        updateData.description = data.description
+        updateData.description = Sanitizer.sanitize(data.description)
       if (data.duration !== undefined) updateData.duration = data.duration
       if (data.availableAnytime !== undefined)
         updateData.availableAnytime = data.availableAnytime
@@ -377,6 +394,10 @@ export class ExamService implements IExamService {
         logger.info('Exam updated successfully', {
           examId: updatedExam._id.toString(),
         })
+
+        // Invalidate cache for this exam and exam list
+        await this.examCache.invalidateExam(data.examId)
+        await this.examCache.invalidateExamList(userId)
 
         return {
           id: updatedExam._id.toString(),
@@ -436,6 +457,10 @@ export class ExamService implements IExamService {
 
       logger.info('Exam deleted successfully', { examId: exam._id.toString() })
 
+      // Invalidate cache for this exam and exam list
+      await this.examCache.invalidateExam(data.examId)
+      await this.examCache.invalidateExamList(userId)
+
       return {
         message: 'Exam deleted successfully',
       }
@@ -453,76 +478,85 @@ export class ExamService implements IExamService {
     userId: string
   ): Promise<GetExamResultsOutput> {
     try {
-      logger.debug('Getting exam results', {
-        examId: data.examId,
-        userId,
-        pagination: data.pagination,
-      })
+      const { examId, pagination } = data
 
-      const exam = await this.examRepository.findById(data.examId)
+      return this.examCache.wrapExamResults(
+        examId,
+        pagination.page,
+        pagination.limit,
+        async () => {
+          logger.debug('Fetching exam results from DB (cache miss)', {
+            examId,
+            userId,
+          })
 
-      if (!exam) {
-        throw new NotFoundError('Exam not found')
-      }
+          const exam = await this.examRepository.findById(examId)
 
-      // Check if user is the creator
-      if (exam.creatorId.toString() !== userId) {
-        throw new ForbiddenError(
-          'You do not have permission to view results for this exam'
-        )
-      }
+          if (!exam) {
+            throw new NotFoundError('Exam not found')
+          }
 
-      // Get all attempts for this exam with pagination
-      const { ExamAttempt } = await import('../../../shared/model')
-      const page = data.pagination.page || 1
-      const limit = data.pagination.limit || 10
-      const skip = (page - 1) * limit
+          // Check if user is the creator
+          if (exam.creatorId.toString() !== userId) {
+            throw new ForbiddenError(
+              'You do not have permission to view results for this exam'
+            )
+          }
 
-      // Get total count for pagination
-      const total = await ExamAttempt.countDocuments({
-        examId: exam._id,
-        status: EXAM_ATTEMPT_STATUS.SUBMITTED,
-      })
+          // Get all attempts for this exam with pagination
+          const { ExamAttempt } = await import('../../../shared/model')
+          const page = pagination.page || 1
+          const limit = pagination.limit || 10
+          const skip = (page - 1) * limit
 
-      // Get paginated attempts
-      const attempts = await ExamAttempt.find({
-        examId: exam._id,
-        status: EXAM_ATTEMPT_STATUS.SUBMITTED,
-      })
-        .populate('userId', 'email')
-        .sort({ submittedAt: -1 })
-        .skip(skip)
-        .limit(limit)
+          // Get total count for pagination
+          const total = await ExamAttempt.countDocuments({
+            examId: exam._id,
+            status: EXAM_ATTEMPT_STATUS.SUBMITTED,
+          })
 
-      const results = attempts.map((attempt: IExamAttempt) => {
-        const percentage = attempt.percentage || 0
-        const passed = percentage >= exam.passPercentage
-        return {
-          attemptId: attempt._id.toString(),
-          participantEmail: (attempt.userId as any).email,
-          score: attempt.score || 0,
-          maxScore: attempt.maxScore || 0,
-          percentage,
-          passed,
-          passPercentage: exam.passPercentage,
-          submittedAt: attempt.submittedAt!.toISOString(),
-          status: attempt.status,
+          // Get paginated attempts with field projection
+          const attempts = await ExamAttempt.find({
+            examId: exam._id,
+            status: EXAM_ATTEMPT_STATUS.SUBMITTED,
+          })
+            .select('_id score maxScore percentage submittedAt status')
+            .populate('userId', 'email')
+            .sort({ submittedAt: -1 })
+            .skip(skip)
+            .limit(limit)
+
+          const results = attempts.map((attempt: IExamAttempt) => {
+            const percentage = attempt.percentage || 0
+            const passed = percentage >= exam.passPercentage
+            return {
+              attemptId: attempt._id.toString(),
+              participantEmail: (attempt.userId as any).email,
+              score: attempt.score || 0,
+              maxScore: attempt.maxScore || 0,
+              percentage,
+              passed,
+              passPercentage: exam.passPercentage,
+              submittedAt: attempt.submittedAt!.toISOString(),
+              status: attempt.status,
+            }
+          })
+
+          const totalPages = Math.ceil(total / limit)
+
+          return {
+            data: results,
+            pagination: {
+              page,
+              limit,
+              total,
+              totalPages,
+              hasNext: page < totalPages,
+              hasPrev: page > 1,
+            },
+          }
         }
-      })
-
-      const totalPages = Math.ceil(total / limit)
-
-      return {
-        data: results,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages,
-          hasNext: page < totalPages,
-          hasPrev: page > 1,
-        },
-      }
+      )
     } catch (error) {
       logger.error('Error getting exam results', error)
       throw error
@@ -537,62 +571,64 @@ export class ExamService implements IExamService {
     userId: string
   ): Promise<GetExamByCodeOutput> {
     try {
-      logger.info('Getting exam by access code', {
-        accessCode: data.accessCode,
-        userId,
+      const { accessCode } = data
+
+      return this.examCache.wrapExamByCode(accessCode, async () => {
+        logger.info('Fetching exam by code from DB (cache miss)', {
+          accessCode,
+          userId,
+        })
+
+        // Find participant by access code
+        const participant = await this.participantRepository.findByAccessCode(
+          accessCode
+        )
+
+        if (!participant) {
+          throw new NotFoundError('Invalid access code')
+        }
+
+        // Verify user matches participant
+        if (participant.userId.toString() !== userId) {
+          throw new ForbiddenError('This access code does not belong to you')
+        }
+
+        // Get exam with optimized projection for participant (excludes correctAnswer)
+        const exam = await this.examRepository.findByIdForParticipant(
+          participant.examId.toString()
+        )
+
+        if (!exam) {
+          throw new NotFoundError('Exam not found')
+        }
+
+        // Questions are already populated with selected fields (no correctAnswer)
+        const questions = (exam.questions as unknown as IQuestion[]) || []
+
+        // Use factory to render questions (excludes sensitive data like correct answers)
+        const renderedQuestions = questions.map((q: IQuestion) => {
+          const questionHandler = QuestionFactory.create(q.type)
+          return questionHandler.render(q)
+        })
+
+        return {
+          id: exam._id.toString(),
+          title: exam.title,
+          description: exam.description,
+          duration: exam.duration,
+          availableAnytime: exam.availableAnytime,
+          startDate: exam.startDate?.toISOString(),
+          endDate: exam.endDate?.toISOString(),
+          randomizeQuestions: exam.randomizeQuestions,
+          passPercentage: exam.passPercentage,
+          questions: renderedQuestions,
+          totalQuestions: questions.length,
+          participantId: participant._id.toString(),
+          accessCode: participant.accessCode,
+        }
       })
-
-      // Find participant by access code
-      const participant = await this.participantRepository.findByAccessCode(
-        data.accessCode
-      )
-
-      if (!participant) {
-        throw new NotFoundError('Invalid access code')
-      }
-
-      // Verify user matches participant
-      if (participant.userId.toString() !== userId) {
-        throw new ForbiddenError('This access code does not belong to you')
-      }
-
-      // Get exam
-      const exam = await this.examRepository.findById(
-        participant.examId.toString()
-      )
-
-      if (!exam) {
-        throw new NotFoundError('Exam not found')
-      }
-
-      // Get questions
-      const questions = await this.questionRepository.findByExamId(
-        exam._id.toString()
-      )
-
-      // Use factory to render questions (excludes sensitive data like correct answers)
-      const renderedQuestions = questions.map((q: IQuestion) => {
-        const questionHandler = QuestionFactory.create(q.type)
-        return questionHandler.render(q)
-      })
-
-      return {
-        id: exam._id.toString(),
-        title: exam.title,
-        description: exam.description,
-        duration: exam.duration,
-        availableAnytime: exam.availableAnytime,
-        startDate: exam.startDate?.toISOString(),
-        endDate: exam.endDate?.toISOString(),
-        randomizeQuestions: exam.randomizeQuestions,
-        passPercentage: exam.passPercentage,
-        questions: renderedQuestions,
-        totalQuestions: questions.length,
-        participantId: participant._id.toString(),
-        accessCode: participant.accessCode,
-      }
     } catch (error) {
-      logger.error('Error getting exam by access code', error)
+      logger.error('Error getting exam by code', error)
       throw error
     }
   }

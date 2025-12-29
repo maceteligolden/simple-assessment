@@ -75,7 +75,7 @@ export function MultipleSelectQuestionRenderer({
                 >
                   <Checkbox
                     checked={isSelected}
-                    onCheckedChange={() => handleOptionToggle(indexStr)}
+                    onChange={() => handleOptionToggle(indexStr)}
                     className="h-5 w-5"
                   />
                   <span className="flex-1 text-base">{option}</span>

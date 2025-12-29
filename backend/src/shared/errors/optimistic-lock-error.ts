@@ -14,10 +14,10 @@ export class OptimisticLockError extends BaseError {
     message = 'Document was modified by another operation. Please refresh and try again.',
     currentVersion: number,
     expectedVersion: number,
-    details?: unknown
+    details?: any
   ) {
     super(message, HTTP_STATUS.CONFLICT, true, {
-      ...details,
+      ...(details || {}),
       currentVersion,
       expectedVersion,
       errorType: 'OptimisticLockError',

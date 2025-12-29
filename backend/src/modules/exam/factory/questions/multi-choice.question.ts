@@ -186,18 +186,19 @@ export class MultiChoiceQuestion implements IQuestionHandler {
 
   /**
    * Validate answer format for multi-choice
-   * Answer should be a string (single selection)
+   * Answer should be a string or number (single selection)
    */
   validateAnswerFormat(answer: unknown): boolean {
-    if (typeof answer !== 'string') {
+    if (typeof answer !== 'string' && typeof answer !== 'number') {
       logger.warn('Invalid answer format for multi-choice question', {
         answer,
-        expectedType: 'string',
+        type: typeof answer,
+        expectedType: 'string or number',
       })
       return false
     }
 
-    if (answer.trim().length === 0) {
+    if (typeof answer === 'string' && answer.trim().length === 0) {
       return false
     }
 
@@ -207,7 +208,11 @@ export class MultiChoiceQuestion implements IQuestionHandler {
   /**
    * Mark multi-choice answer
    * Handles both index-based answers (from frontend) and text-based answers
-   * Compares with correct answer (which is stored as option text)
+   * Compares with correct answer (which can be stored as index or text)
+   * @param answer - User's answer (string or number)
+   * @param correctAnswer - Correct answer (string or number)
+   * @param points - Points for this question
+   * @param options - Optional question options (required for index-to-text conversion)
    */
   markAnswer(
     answer: unknown,
@@ -216,55 +221,42 @@ export class MultiChoiceQuestion implements IQuestionHandler {
     options?: string[]
   ): number {
     if (!this.validateAnswerFormat(answer)) {
-      return 0
-    }
-
-    // Ensure correctAnswer is a string
-    if (typeof correctAnswer !== 'string') {
-      logger.error('Invalid correct answer format for multi-choice question', {
-        correctAnswer,
+      logger.warn('Multi-choice answer marking failed: invalid answer format', {
+        answer,
       })
       return 0
     }
 
-    const userAnswerStr = String(answer).trim()
-    const correctAnswerStr = String(correctAnswer).trim()
+    const normalizeToText = (val: any): string => {
+      const valStr = String(val).trim()
+      const valIndex = parseInt(valStr, 10)
+      const isIndex =
+        !isNaN(valIndex) &&
+        valIndex.toString() === valStr &&
+        /^\d+$/.test(valStr)
 
-    // Check if user answer is an index (numeric string like "0", "1", "2")
-    const answerIndex = parseInt(userAnswerStr, 10)
-    const isIndexAnswer =
-      !isNaN(answerIndex) &&
-      answerIndex.toString() === userAnswerStr &&
-      /^\d+$/.test(userAnswerStr)
-
-    let normalizedUserAnswer: string
-
-    if (isIndexAnswer && options && options.length > 0) {
-      // User answer is an index, convert to option text
-      if (answerIndex >= 0 && answerIndex < options.length) {
-        normalizedUserAnswer = options[answerIndex].trim().toLowerCase()
-      } else {
-        logger.warn('User answer index out of range', {
-          answerIndex,
-          optionsLength: options.length,
-        })
-        return 0
+      if (
+        isIndex &&
+        options &&
+        options.length > 0 &&
+        valIndex >= 0 &&
+        valIndex < options.length
+      ) {
+        return options[valIndex].trim().toLowerCase()
       }
-    } else {
-      // User answer is already text, use as-is
-      normalizedUserAnswer = userAnswerStr.toLowerCase()
+      return valStr.toLowerCase()
     }
 
-    // Normalize correct answer (it's stored as option text)
-    const normalizedCorrectAnswer = correctAnswerStr.trim().toLowerCase()
+    const normalizedUserAnswer = normalizeToText(answer)
+    const normalizedCorrectAnswer = normalizeToText(correctAnswer)
 
     const isCorrect = normalizedUserAnswer === normalizedCorrectAnswer
 
     logger.debug('Multi-choice answer marked', {
-      originalUserAnswer: userAnswerStr,
+      originalUserAnswer: answer,
       normalizedUserAnswer,
+      originalCorrectAnswer: correctAnswer,
       normalizedCorrectAnswer,
-      isIndexAnswer,
       isCorrect,
       points: isCorrect ? points : 0,
     })

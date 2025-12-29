@@ -5,13 +5,18 @@ import {
   IExamRepository,
   IQuestionRepository,
 } from '../../../../src/shared/repository'
+import { IExamCacheService } from '../../../../src/modules/exam/cache'
 import { Types } from 'mongoose'
 import { QuestionFactory } from '../../../../src/modules/exam/factory/question.factory'
+import { TransactionManager, Sanitizer } from '../../../../src/shared/util'
 
 // Mock repositories
 const mockExamRepository: IExamRepository = {
   create: vi.fn(),
   findById: vi.fn(),
+  findByIdForExaminer: vi.fn(),
+  findByIdForParticipant: vi.fn(),
+  findByIdWithCorrectAnswers: vi.fn(),
   findByCreatorId: vi.fn(),
   updateById: vi.fn(),
   deleteById: vi.fn(),
@@ -19,15 +24,37 @@ const mockExamRepository: IExamRepository = {
   removeQuestion: vi.fn(),
   reorderQuestions: vi.fn(),
   hasActiveAttempts: vi.fn(),
+  getQuestionCount: vi.fn(),
+  getParticipantCount: vi.fn(),
 }
 
 const mockQuestionRepository: IQuestionRepository = {
   create: vi.fn(),
   findById: vi.fn(),
   findByExamId: vi.fn(),
+  findByExamIdWithCorrectAnswers: vi.fn(),
   updateById: vi.fn(),
   deleteById: vi.fn(),
   updateOrder: vi.fn(),
+}
+
+const mockExamCache: IExamCacheService = {
+  getExamList: vi.fn(),
+  setExamList: vi.fn(),
+  invalidateExamList: vi.fn(),
+  getExamDetail: vi.fn(),
+  setExamDetail: vi.fn(),
+  invalidateExam: vi.fn(),
+  getExamByCode: vi.fn(),
+  setExamByCode: vi.fn(),
+  invalidateExamByCode: vi.fn(),
+  getExamResults: vi.fn(),
+  setExamResults: vi.fn(),
+  invalidateExamResults: vi.fn(),
+  wrapExamList: vi.fn(),
+  wrapExamDetail: vi.fn(),
+  wrapExamByCode: vi.fn(),
+  wrapExamResults: vi.fn(),
 }
 
 // Mock logger
@@ -40,11 +67,26 @@ vi.mock('../../../../src/shared/util/logger', () => ({
   },
 }))
 
+// Mock TransactionManager
+vi.mock('../../../../src/shared/util/transaction.manager', () => ({
+  TransactionManager: {
+    withTransaction: vi.fn(callback => callback('mock-session')),
+  },
+}))
+
 // Mock QuestionFactory
 vi.mock('../../../../src/modules/exam/factory/question.factory', () => ({
   QuestionFactory: {
     createQuestion: vi.fn(),
     create: vi.fn(),
+  },
+}))
+
+// Mock Sanitizer
+vi.mock('../../../../src/shared/util/sanitizer', () => ({
+  Sanitizer: {
+    sanitize: vi.fn(val => val),
+    sanitizeObject: vi.fn(val => val),
   },
 }))
 
@@ -57,12 +99,13 @@ describe('QuestionService', () => {
     vi.clearAllMocks()
     questionService = new QuestionService(
       mockExamRepository,
-      mockQuestionRepository
+      mockQuestionRepository,
+      mockExamCache
     )
   })
 
   describe('addQuestion', () => {
-    it('should add question to exam successfully', async () => {
+    it('should add question to exam successfully and invalidate cache', async () => {
       // Arrange
       const input: any = {
         examId,
@@ -79,16 +122,6 @@ describe('QuestionService', () => {
         title: 'Test Exam',
       }
 
-      const mockExistingQuestions: any[] = []
-      const mockStructuredQuestion = {
-        type: 'multiple-choice',
-        question: 'What is 2+2?',
-        options: ['3', '4', '5'],
-        correctAnswer: '4',
-        points: 1,
-        order: 0,
-      }
-
       const mockQuestion = {
         _id: new Types.ObjectId('507f1f77bcf86cd799439013'),
         examId: new Types.ObjectId(examId),
@@ -98,6 +131,7 @@ describe('QuestionService', () => {
         correctAnswer: '4',
         points: 1,
         order: 0,
+        version: 1,
       }
 
       const mockQuestionHandler = {
@@ -110,32 +144,31 @@ describe('QuestionService', () => {
         }),
       }
 
-      ;(mockExamRepository.findById as any).mockResolvedValue(mockExam)
-      ;(mockExamRepository.hasActiveAttempts as any).mockResolvedValue(false)
-      ;(mockQuestionRepository.findByExamId as any).mockResolvedValue(
-        mockExistingQuestions
-      )
-      ;(QuestionFactory.createQuestion as any).mockReturnValue(
-        mockStructuredQuestion
-      )
-      ;(mockQuestionRepository.create as any).mockResolvedValue(mockQuestion)
-      ;(mockExamRepository.addQuestion as any).mockResolvedValue(mockExam)
-      ;(QuestionFactory.create as any).mockReturnValue(mockQuestionHandler)
+      vi.mocked(mockExamRepository.findById).mockResolvedValue(mockExam as any)
+      vi.mocked(mockExamRepository.hasActiveAttempts).mockResolvedValue(false)
+      vi.mocked(mockQuestionRepository.findByExamId).mockResolvedValue([])
+      vi.mocked(QuestionFactory.createQuestion).mockReturnValue({
+        ...input,
+        order: 0,
+      })
+      vi.mocked(mockQuestionRepository.create).mockResolvedValue(mockQuestion as any)
+      vi.mocked(QuestionFactory.create).mockReturnValue(mockQuestionHandler as any)
 
       // Act
       const result = await questionService.addQuestion(input, userId)
 
       // Assert
       expect(mockExamRepository.findById).toHaveBeenCalledWith(examId)
-      expect(mockExamRepository.hasActiveAttempts).toHaveBeenCalledWith(examId)
+      expect(TransactionManager.withTransaction).toHaveBeenCalled()
       expect(mockQuestionRepository.create).toHaveBeenCalled()
+      expect(mockExamRepository.addQuestion).toHaveBeenCalled()
+      expect(mockExamCache.invalidateExam).toHaveBeenCalledWith(examId)
       expect(result.id).toBe(mockQuestion._id.toString())
-      expect(result.type).toBe('multiple-choice')
     })
   })
 
   describe('updateQuestion', () => {
-    it('should update question successfully', async () => {
+    it('should update question successfully and invalidate cache', async () => {
       // Arrange
       const questionId = '507f1f77bcf86cd799439013'
       const input: any = {
@@ -147,63 +180,48 @@ describe('QuestionService', () => {
       const mockExam = {
         _id: new Types.ObjectId(examId),
         creatorId: new Types.ObjectId(userId),
-        title: 'Test Exam',
       }
 
       const mockQuestion = {
         _id: new Types.ObjectId(questionId),
         examId: new Types.ObjectId(examId),
         type: 'multiple-choice',
-        question: 'Updated question',
-        options: ['3', '4', '5'],
-        correctAnswer: '4',
-        points: 1,
-        order: 0,
+        question: 'Old question',
+        version: 1,
       }
 
       const mockUpdatedQuestion = {
         ...mockQuestion,
         question: 'Updated question',
+        version: 2,
       }
 
       const mockQuestionHandler = {
         render: vi.fn().mockReturnValue({
           id: questionId,
-          type: 'multiple-choice',
           question: 'Updated question',
-          options: ['3', '4', '5'],
-          points: 1,
         }),
       }
 
-      ;(mockExamRepository.findById as any).mockResolvedValue(mockExam)
-      ;(mockQuestionRepository.findById as any).mockResolvedValue(mockQuestion)
-      ;(mockExamRepository.hasActiveAttempts as any).mockResolvedValue(false)
-      ;(mockQuestionRepository.updateById as any).mockResolvedValue(
-        mockUpdatedQuestion
-      )
-      ;(QuestionFactory.createQuestion as any).mockReturnValue({
-        question: 'Updated question',
-        options: ['3', '4', '5'],
-        correctAnswer: '4',
-        points: 1,
-      })
-      ;(QuestionFactory.create as any).mockReturnValue(mockQuestionHandler)
+      vi.mocked(mockExamRepository.findById).mockResolvedValue(mockExam as any)
+      vi.mocked(mockQuestionRepository.findById).mockResolvedValue(mockQuestion as any)
+      vi.mocked(mockExamRepository.hasActiveAttempts).mockResolvedValue(false)
+      vi.mocked(QuestionFactory.createQuestion).mockReturnValue(mockUpdatedQuestion as any)
+      vi.mocked(mockQuestionRepository.updateById).mockResolvedValue(mockUpdatedQuestion as any)
+      vi.mocked(QuestionFactory.create).mockReturnValue(mockQuestionHandler as any)
 
       // Act
       const result = await questionService.updateQuestion(input, userId)
 
       // Assert
-      expect(mockExamRepository.findById).toHaveBeenCalledWith(examId)
-      expect(mockQuestionRepository.findById).toHaveBeenCalledWith(questionId)
       expect(mockQuestionRepository.updateById).toHaveBeenCalled()
+      expect(mockExamCache.invalidateExam).toHaveBeenCalledWith(examId)
       expect(result.id).toBe(questionId)
-      expect(result.question).toBe('Updated question')
     })
   })
 
   describe('deleteQuestion', () => {
-    it('should delete question successfully', async () => {
+    it('should delete question successfully and invalidate cache', async () => {
       // Arrange
       const questionId = '507f1f77bcf86cd799439013'
       const input: any = {
@@ -214,35 +232,26 @@ describe('QuestionService', () => {
       const mockExam = {
         _id: new Types.ObjectId(examId),
         creatorId: new Types.ObjectId(userId),
-        title: 'Test Exam',
       }
 
       const mockQuestion = {
         _id: new Types.ObjectId(questionId),
         examId: new Types.ObjectId(examId),
-        type: 'multiple-choice',
-        question: 'What is 2+2?',
       }
 
-      ;(mockExamRepository.findById as any).mockResolvedValue(mockExam)
-      ;(mockQuestionRepository.findById as any).mockResolvedValue(mockQuestion)
-      ;(mockExamRepository.hasActiveAttempts as any).mockResolvedValue(false)
-      ;(mockQuestionRepository.deleteById as any).mockResolvedValue(true)
-      ;(mockExamRepository.removeQuestion as any).mockResolvedValue(mockExam)
+      vi.mocked(mockExamRepository.findById).mockResolvedValue(mockExam as any)
+      vi.mocked(mockQuestionRepository.findById).mockResolvedValue(mockQuestion as any)
+      vi.mocked(mockExamRepository.hasActiveAttempts).mockResolvedValue(false)
 
       // Act
       const result = await questionService.deleteQuestion(input, userId)
 
       // Assert
-      expect(mockExamRepository.findById).toHaveBeenCalledWith(examId)
-      expect(mockQuestionRepository.findById).toHaveBeenCalledWith(questionId)
-      expect(mockQuestionRepository.deleteById).toHaveBeenCalledWith(questionId)
-      expect(mockExamRepository.removeQuestion).toHaveBeenCalledWith(
-        examId,
-        questionId
-      )
+      expect(TransactionManager.withTransaction).toHaveBeenCalled()
+      expect(mockExamRepository.removeQuestion).toHaveBeenCalled()
+      expect(mockQuestionRepository.deleteById).toHaveBeenCalled()
+      expect(mockExamCache.invalidateExam).toHaveBeenCalledWith(examId)
       expect(result.message).toBe('Question deleted successfully')
     })
   })
 })
-

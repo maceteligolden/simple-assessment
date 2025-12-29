@@ -1,9 +1,10 @@
 import { injectable, inject } from 'tsyringe'
 import { IExamRepository } from '../../../shared/repository/exam.repository'
 import { IQuestionRepository } from '../../../shared/repository/question.repository'
+import { IExamCacheService } from '../cache'
 import { QuestionFactory } from '../factory/question.factory'
 import { QuestionType, IQuestion } from '../../../shared/model/question.model'
-import { logger, TransactionManager } from '../../../shared/util'
+import { logger, TransactionManager, Sanitizer } from '../../../shared/util'
 import {
   AddQuestionInput,
   AddQuestionOutput,
@@ -32,7 +33,9 @@ export class QuestionService implements IQuestionService {
     @inject('IExamRepository')
     private readonly examRepository: IExamRepository,
     @inject('IQuestionRepository')
-    private readonly questionRepository: IQuestionRepository
+    private readonly questionRepository: IQuestionRepository,
+    @inject('IExamCacheService')
+    private readonly examCache: IExamCacheService
   ) {
     logger.debug('QuestionService initialized')
   }
@@ -85,14 +88,21 @@ export class QuestionService implements IQuestionService {
           : -1
       const nextOrder = maxOrder + 1
 
+      // Sanitize question data
+      const sanitizedQuestion = Sanitizer.sanitizeObject(data.question)
+      const sanitizedOptions = data.options
+        ? data.options.map(opt => Sanitizer.sanitize(opt))
+        : undefined
+      const sanitizedCorrectAnswer = Sanitizer.sanitizeObject(data.correctAnswer)
+
       // Create question using factory (validates and structures the data)
       let structuredQuestion
       try {
         structuredQuestion = QuestionFactory.createQuestion({
           type: data.type as QuestionType,
-          question: data.question,
-          options: data.options,
-          correctAnswer: data.correctAnswer,
+          question: sanitizedQuestion,
+          options: sanitizedOptions,
+          correctAnswer: sanitizedCorrectAnswer,
           points: data.points,
           order: nextOrder,
         })
@@ -138,6 +148,9 @@ export class QuestionService implements IQuestionService {
         questionId: question._id.toString(),
         examId: exam._id.toString(),
       })
+
+      // Invalidate exam cache
+      await this.examCache.invalidateExam(exam._id.toString())
 
       // Render question using factory (excludes sensitive data like correctAnswer)
       const questionHandler = QuestionFactory.create(question.type)
@@ -206,10 +219,15 @@ export class QuestionService implements IQuestionService {
 
       // Prepare update data
       const updateData: Partial<IQuestion> = {}
-      if (data.question !== undefined) updateData.question = data.question
-      if (data.options !== undefined) updateData.options = data.options
-      if (data.correctAnswer !== undefined)
-        updateData.correctAnswer = data.correctAnswer
+      if (data.question !== undefined) {
+        updateData.question = Sanitizer.sanitizeObject(data.question)
+      }
+      if (data.options !== undefined) {
+        updateData.options = data.options.map(opt => Sanitizer.sanitize(opt))
+      }
+      if (data.correctAnswer !== undefined) {
+        updateData.correctAnswer = Sanitizer.sanitizeObject(data.correctAnswer)
+      }
       if (data.points !== undefined) updateData.points = data.points
 
       // Validate and structure updated question if any question-related fields are being updated
@@ -282,6 +300,9 @@ export class QuestionService implements IQuestionService {
         logger.info('Question updated successfully', {
           questionId: updatedQuestion._id.toString(),
         })
+
+        // Invalidate exam cache
+        await this.examCache.invalidateExam(exam._id.toString())
 
         // Render question using factory (excludes sensitive data like correctAnswer)
         const questionHandler = QuestionFactory.create(updatedQuestion.type)
@@ -380,6 +401,9 @@ export class QuestionService implements IQuestionService {
       logger.info('Question deleted successfully', {
         questionId: question._id.toString(),
       })
+
+      // Invalidate exam cache
+      await this.examCache.invalidateExam(exam._id.toString())
 
       return {
         message: 'Question deleted successfully',

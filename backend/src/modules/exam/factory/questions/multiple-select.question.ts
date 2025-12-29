@@ -215,25 +215,28 @@ export class MultipleSelectQuestion implements IQuestionHandler {
 
   /**
    * Validate answer format for multiple-select
-   * Answer should be an array of selected option indices
+   * Answer should be an array of selected option indices (strings or numbers)
    */
   validateAnswerFormat(answer: unknown): boolean {
     if (!Array.isArray(answer)) {
       logger.warn('Invalid answer format for multiple-select question', {
         answer,
+        type: typeof answer,
         expectedType: 'array',
       })
       return false
     }
 
-    // Validate all items are strings (representing indices)
+    // Allow both strings and numbers for selected option indices
     const allValid = answer.every(
-      item => typeof item === 'string' && item.trim().length > 0
+      item =>
+        (typeof item === 'string' && item.trim().length > 0) ||
+        (typeof item === 'number' && !isNaN(item))
     )
 
     if (!allValid) {
       logger.warn(
-        'Invalid answer format for multiple-select question: all items must be non-empty strings',
+        'Invalid answer format for multiple-select question: all items must be non-empty strings or numbers',
         {
           answer,
         }
@@ -247,10 +250,11 @@ export class MultipleSelectQuestion implements IQuestionHandler {
   /**
    * Mark multiple-select answer
    * All-or-nothing scoring: must select all correct answers and no incorrect ones
-   * @param answer - User's answer (array of option indices as strings)
-   * @param correctAnswer - Correct answer (array of option indices as strings)
+   * Handles both index-based and text-based answers
+   * @param answer - User's answer (array of strings or numbers)
+   * @param correctAnswer - Correct answer (array of strings or numbers)
    * @param points - Points for this question
-   * @param options - Optional question options (for validation)
+   * @param options - Optional question options (required for index-to-text conversion)
    */
   markAnswer(
     answer: unknown,
@@ -259,6 +263,9 @@ export class MultipleSelectQuestion implements IQuestionHandler {
     options?: string[]
   ): number {
     if (!this.validateAnswerFormat(answer)) {
+      logger.warn('Multiple-select answer marking failed: invalid answer format', {
+        answer,
+      })
       return 0
     }
 
@@ -273,33 +280,37 @@ export class MultipleSelectQuestion implements IQuestionHandler {
       return 0
     }
 
-    // Normalize both arrays: sort and remove duplicates
-    const userAnswerArray = (answer as string[])
-      .map(ans => String(ans).trim())
-      .filter(ans => {
-        // Validate indices if options are provided
-        if (options) {
-          const index = parseInt(ans, 10)
-          return (
-            !isNaN(index) &&
-            index >= 0 &&
-            index < options.length &&
-            index.toString() === ans &&
-            /^\d+$/.test(ans)
-          )
-        }
-        return /^\d+$/.test(ans) // At least validate it's numeric
-      })
-      .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+    const normalizeToText = (arr: any[]): string[] => {
+      return arr
+        .map(item => {
+          const itemStr = String(item).trim()
+          const itemIndex = parseInt(itemStr, 10)
+          const isIndex =
+            !isNaN(itemIndex) &&
+            itemIndex.toString() === itemStr &&
+            /^\d+$/.test(itemStr)
 
-    const correctAnswerArray = (correctAnswer as string[])
-      .map(ans => String(ans).trim())
-      .filter(ans => /^\d+$/.test(ans))
-      .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+          if (
+            isIndex &&
+            options &&
+            options.length > 0 &&
+            itemIndex >= 0 &&
+            itemIndex < options.length
+          ) {
+            return options[itemIndex].trim().toLowerCase()
+          }
+          return itemStr.toLowerCase()
+        })
+        .filter(item => item.length > 0)
+        .sort()
+    }
+
+    const normalizedUserAnswers = normalizeToText(answer as any[])
+    const normalizedCorrectAnswers = normalizeToText(correctAnswer as any[])
 
     // Remove duplicates
-    const uniqueUserAnswers = Array.from(new Set(userAnswerArray))
-    const uniqueCorrectAnswers = Array.from(new Set(correctAnswerArray))
+    const uniqueUserAnswers = Array.from(new Set(normalizedUserAnswers))
+    const uniqueCorrectAnswers = Array.from(new Set(normalizedCorrectAnswers))
 
     // All-or-nothing: must match exactly (same length and same values)
     const isCorrect =

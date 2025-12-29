@@ -1,10 +1,16 @@
 import { injectable, inject } from 'tsyringe'
 import { Request, Response, NextFunction } from 'express'
-import { ResponseUtil } from '../../shared/util/response'
+import { ResponseUtil } from '../../shared/util'
 import { HTTP_STATUS } from '../../shared/constants'
 import { logger } from '../../shared/util/logger'
-import { SignUpInput, SignInInput } from './auth.validation'
-import { IAuthService, IAuthController } from './interfaces/auth.interface'
+import {
+  IAuthService,
+  IAuthController,
+} from './interfaces/auth.interface'
+import {
+  SignUpSchemaType,
+  SignInSchemaType,
+} from './auth.validation'
 import { UnauthorizedError } from '../../shared/errors'
 
 /**
@@ -27,7 +33,7 @@ export class AuthController implements IAuthController {
    */
   async signUp(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { body } = req as SignUpInput
+      const { body } = req as unknown as SignUpSchemaType
       const { firstName, lastName, email, password, role } = body
 
       const result = await this.authService.signUp(
@@ -55,7 +61,7 @@ export class AuthController implements IAuthController {
    */
   async signIn(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { body } = req as SignInInput
+      const { body } = req as unknown as SignInSchemaType
       const { email, password } = body
 
       const result = await this.authService.signIn(

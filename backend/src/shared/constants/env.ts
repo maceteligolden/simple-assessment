@@ -97,17 +97,6 @@ export const ENV = {
   // CORS
   CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:3001',
 
-  // Rate Limiting
-  RATE_LIMIT_WINDOW_MS: parseInt(
-    process.env.RATE_LIMIT_WINDOW_MS || '900000',
-    10
-  ), // 15 minutes in milliseconds
-  RATE_LIMIT_MAX_REQUESTS: parseInt(
-    process.env.RATE_LIMIT_MAX_REQUESTS || '100',
-    10
-  ), // Maximum requests per window
-  SKIP_RATE_LIMIT: process.env.SKIP_RATE_LIMIT === 'true', // Skip rate limiting in development
-
   // Cache Configuration
   CACHE_DEFAULT_TTL_SECONDS: parseInt(
     process.env.CACHE_DEFAULT_TTL_SECONDS || '3600',

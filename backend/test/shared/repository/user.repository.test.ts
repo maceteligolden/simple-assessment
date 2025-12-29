@@ -4,6 +4,9 @@ import { UserRepository } from '../../../src/shared/repository/user.repository'
 import { User } from '../../../src/shared/model/user.model'
 import { Types } from 'mongoose'
 
+// Shared mock for tracking save calls
+const mockSave = vi.fn()
+
 // Mock the User model
 vi.mock('../../../src/shared/model/user.model', async () => {
   const { vi } = await import('vitest')
@@ -31,8 +34,8 @@ vi.mock('../../../src/shared/model/user.model', async () => {
       this.role = data?.role || 'participant'
       this.firstName = data?.firstName || 'Test'
       this.lastName = data?.lastName || 'User'
-      this.save = vi.fn().mockResolvedValue(true)
-      this.toObject = vi.fn().mockReturnValue({})
+      this.save = mockSave.mockResolvedValue(this)
+      this.toObject = vi.fn().mockReturnValue(this)
       Object.assign(this, data)
     }
   }
@@ -65,6 +68,7 @@ describe('UserRepository', () => {
   beforeEach(() => {
     repository = new UserRepository()
     vi.clearAllMocks()
+    mockSave.mockReset()
     
     // Create fresh mock query
     mockQuery = {
@@ -281,6 +285,48 @@ describe('UserRepository', () => {
     })
   })
 
+  describe('create', () => {
+    it('should create a user successfully', async () => {
+      // Arrange
+      const userData = {
+        firstName: 'John',
+        lastName: 'Doe',
+        email: 'john@example.com',
+        password: 'hashedPassword',
+        role: 'participant' as const,
+      }
+      mockSave.mockResolvedValue({ _id: new Types.ObjectId() })
+
+      // Act
+      const result = await repository.create(userData)
+
+      // Assert
+      expect(result).toBeDefined()
+      expect(mockSave).toHaveBeenCalled()
+    })
+
+    it('should create a user with session', async () => {
+      // Arrange
+      const userData = {
+        firstName: 'John',
+        lastName: 'Doe',
+        email: 'john@example.com',
+        password: 'hashedPassword',
+        role: 'participant' as const,
+      }
+      const mockSession = { id: 'mock-session' } as any
+      mockSave.mockResolvedValue({ _id: new Types.ObjectId() })
+
+      // Act
+      await repository.create(userData, { session: mockSession })
+
+      // Assert
+      expect(mockSave).toHaveBeenCalledWith({
+        session: mockSession,
+      })
+    })
+  })
+
   describe('updateRefreshToken', () => {
     it('should update refresh token successfully', async () => {
       // Arrange
@@ -302,18 +348,25 @@ describe('UserRepository', () => {
       expect(result).toBe(updatedUser)
     })
 
-    it('should return null when user not found', async () => {
+    it('should update refresh token with session', async () => {
       // Arrange
       const userId = '507f1f77bcf86cd799439011'
       const refreshToken = 'new-refresh-token'
+      const mockSession = { id: 'mock-session' } as any
 
-      ;(User.findByIdAndUpdate as any).mockResolvedValue(null)
+      ;(User.findByIdAndUpdate as any).mockResolvedValue(mockUserInstance)
 
       // Act
-      const result = await repository.updateRefreshToken(userId, refreshToken)
+      await repository.updateRefreshToken(userId, refreshToken, {
+        session: mockSession,
+      })
 
       // Assert
-      expect(result).toBeNull()
+      expect(User.findByIdAndUpdate).toHaveBeenCalledWith(
+        userId,
+        { refreshToken },
+        { new: true, session: mockSession }
+      )
     })
   })
 

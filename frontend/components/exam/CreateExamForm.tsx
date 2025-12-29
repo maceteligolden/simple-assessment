@@ -43,6 +43,7 @@ export default function CreateExamForm({
     startDate: initialData?.startDate || '',
     endDate: initialData?.endDate || '',
     randomizeQuestions: initialData?.randomizeQuestions || false,
+    showResultsImmediately: initialData?.showResultsImmediately ?? true,
     passPercentage: initialData?.passPercentage?.toString() || '50',
   })
 
@@ -71,6 +72,7 @@ export default function CreateExamForm({
         startDate: initialData.startDate || '',
         endDate: initialData.endDate || '',
         randomizeQuestions: initialData.randomizeQuestions || false,
+        showResultsImmediately: initialData.showResultsImmediately ?? true,
         passPercentage: initialData.passPercentage?.toString() || '50',
       })
       setQuestions(
@@ -346,9 +348,10 @@ export default function CreateExamForm({
         ? undefined
         : formData.endDate || undefined,
       randomizeQuestions: formData.randomizeQuestions,
+      showResultsImmediately: formData.showResultsImmediately,
       passPercentage: parseInt(formData.passPercentage, 10),
       questions: questions.map(q => ({
-        type: 'multiple-choice' as const, // Only multiple-choice for now
+        type: q.type,
         question: q.question.trim(),
         options: q.options.map(opt => opt.trim()),
         correctAnswer: q.correctAnswer,
@@ -563,6 +566,26 @@ export default function CreateExamForm({
                   className="text-sm font-medium"
                 >
                   Randomize question order
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="showResultsImmediately"
+                  checked={formData.showResultsImmediately}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      showResultsImmediately: e.target.checked,
+                    })
+                  }
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <label
+                  htmlFor="showResultsImmediately"
+                  className="text-sm font-medium"
+                >
+                  Show results immediately after submission
                 </label>
               </div>
             </div>

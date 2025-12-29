@@ -1,16 +1,10 @@
 import { injectable } from 'tsyringe'
 import { IExam, Exam } from '../model/exam.model'
+import { ExamParticipant } from '../model/exam-participant.model'
 import { logger } from '../util/logger'
 import { Types, ClientSession } from 'mongoose'
 import { EXAM_ATTEMPT_STATUS } from '../constants'
-
-/**
- * Repository options for operations that support transactions and optimistic locking
- */
-export interface RepositoryOptions {
-  session?: ClientSession
-  expectedVersion?: number // For optimistic locking - expected version of the document
-}
+import { RepositoryOptions } from '../interfaces'
 
 /**
  * Exam Repository Interface
@@ -32,6 +26,18 @@ export interface IExamRepository {
     options?: RepositoryOptions
   ): Promise<IExam>
   findById(id: string, options?: RepositoryOptions): Promise<IExam | null>
+  findByIdWithCorrectAnswers(
+    id: string,
+    options?: RepositoryOptions
+  ): Promise<IExam | null>
+  findByIdForExaminer(
+    id: string,
+    options?: RepositoryOptions
+  ): Promise<IExam | null>
+  findByIdForParticipant(
+    id: string,
+    options?: RepositoryOptions
+  ): Promise<IExam | null>
   findByCreatorId(
     creatorId: string,
     filters?: {
@@ -40,6 +46,11 @@ export interface IExamRepository {
     },
     options?: RepositoryOptions
   ): Promise<IExam[]>
+  getQuestionCount(examId: string, options?: RepositoryOptions): Promise<number>
+  getParticipantCount(
+    examId: string,
+    options?: RepositoryOptions
+  ): Promise<number>
   updateById(
     id: string,
     data: Partial<IExam>,
@@ -61,7 +72,10 @@ export interface IExamRepository {
     questionIds: string[],
     options?: RepositoryOptions
   ): Promise<IExam | null>
-  hasActiveAttempts(examId: string, options?: RepositoryOptions): Promise<boolean>
+  hasActiveAttempts(
+    examId: string,
+    options?: RepositoryOptions
+  ): Promise<boolean>
 }
 
 /**
@@ -158,13 +172,26 @@ export class ExamRepository implements IExamRepository {
     }
   }
 
-  async findById(id: string): Promise<IExam | null> {
+  async findById(
+    id: string,
+    options?: RepositoryOptions
+  ): Promise<IExam | null> {
     try {
       logger.debug('Finding exam by ID in repository', { examId: id })
-      const exam = await Exam.findOne({
+      const query = Exam.findOne({
         _id: id,
         isDeleted: false,
-      }).populate('questions')
+      })
+
+      if (options?.session) {
+        query.session(options.session)
+      }
+
+      const exam = await query.populate({
+        path: 'questions',
+        select: '_id type question options points order version',
+      })
+
       return exam
     } catch (error) {
       logger.error('Error finding exam by ID in repository', error)
@@ -172,9 +199,96 @@ export class ExamRepository implements IExamRepository {
     }
   }
 
+  /**
+   * Find exam by ID with correct answers populated (for marking and results)
+   */
+  async findByIdWithCorrectAnswers(
+    id: string,
+    options?: RepositoryOptions
+  ): Promise<IExam | null> {
+    try {
+      logger.debug('Finding exam by ID with correct answers in repository', {
+        examId: id,
+      })
+      const query = Exam.findOne({
+        _id: id,
+        isDeleted: false,
+      })
+
+      if (options?.session) {
+        query.session(options.session)
+      }
+
+      const exam = await query.populate({
+        path: 'questions',
+        select: '_id type question options points order version correctAnswer',
+      })
+
+      return exam
+    } catch (error) {
+      logger.error(
+        'Error finding exam by ID with correct answers in repository',
+        error
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Find exam by ID with field projection for examiner (includes correctAnswer)
+   */
+  async findByIdForExaminer(
+    id: string,
+    options?: RepositoryOptions
+  ): Promise<IExam | null> {
+    return this.findById(id, options)
+  }
+
+  /**
+   * Find exam by ID with field projection for participant (excludes correctAnswer)
+   */
+  async findByIdForParticipant(
+    id: string,
+    options?: RepositoryOptions
+  ): Promise<IExam | null> {
+    try {
+      logger.debug('Finding exam by ID for participant in repository', {
+        examId: id,
+      })
+      const query = Exam.findOne({
+        _id: id,
+        isDeleted: false,
+      }).select(
+        '_id title description duration availableAnytime startDate endDate randomizeQuestions'
+      )
+
+      if (options?.session) {
+        query.session(options.session)
+      }
+
+      const exam = await query.populate({
+        path: 'questions',
+        select: '_id type question options points order',
+        // Exclude correctAnswer for security
+      })
+
+      return exam
+    } catch (error) {
+      logger.error(
+        'Error finding exam by ID for participant in repository',
+        error
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Finding exams by creator ID
+   */
   async findByCreatorId(
     creatorId: string,
-    filters?: { search?: string; isActive?: boolean }
+    filters?: { search?: string; isActive?: boolean },
+    options?: RepositoryOptions
   ): Promise<IExam[]> {
     try {
       logger.debug('Finding exams by creator ID in repository', {
@@ -198,14 +312,75 @@ export class ExamRepository implements IExamRepository {
         ]
       }
 
-      const exams = await Exam.find(query)
+      const dbQuery = Exam.find(query)
+        .select('_id title description duration createdAt')
         .sort({ createdAt: -1 })
-        .populate('questions')
+
+      if (options?.session) {
+        dbQuery.session(options.session)
+      }
+
+      const exams = await dbQuery
+      // Note: questionCount and participantCount should be calculated separately
+      // to avoid loading full arrays
 
       return exams
     } catch (error) {
       logger.error('Error finding exams by creator ID in repository', error)
       throw error
+    }
+  }
+
+  /**
+   * Get question count for an exam
+   */
+  async getQuestionCount(
+    examId: string,
+    options?: RepositoryOptions
+  ): Promise<number> {
+    try {
+      const pipeline: any[] = [
+        { $match: { _id: new Types.ObjectId(examId), isDeleted: false } },
+        {
+          $project: {
+            questionCount: { $size: { $ifNull: ['$questions', []] } },
+          },
+        },
+      ]
+
+      const aggregationOptions: any = {}
+      if (options?.session) {
+        aggregationOptions.session = options.session
+      }
+
+      const result = await Exam.aggregate(pipeline, aggregationOptions)
+      return result[0]?.questionCount || 0
+    } catch (error) {
+      logger.error('Error getting question count', error)
+      return 0
+    }
+  }
+
+  /**
+   * Get participant count for an exam
+   */
+  async getParticipantCount(
+    examId: string,
+    options?: RepositoryOptions
+  ): Promise<number> {
+    try {
+      const query = ExamParticipant.countDocuments({
+        examId: new Types.ObjectId(examId),
+      })
+
+      if (options?.session) {
+        query.session(options.session)
+      }
+
+      return await query
+    } catch (error) {
+      logger.error('Error getting participant count', error)
+      return 0
     }
   }
 
@@ -298,12 +473,12 @@ export class ExamRepository implements IExamRepository {
       if (options?.session) {
         updateOptions.session = options.session
       }
-      
-      const exam = await Exam.findByIdAndUpdate(
+
+      const exam = (await Exam.findByIdAndUpdate(
         examId,
         { $addToSet: { questions: new Types.ObjectId(questionId) } },
         updateOptions
-      )
+      )) as IExam | null
       return exam
     } catch (error) {
       logger.error('Error adding question to exam in repository', error)
@@ -326,12 +501,12 @@ export class ExamRepository implements IExamRepository {
       if (options?.session) {
         updateOptions.session = options.session
       }
-      
-      const exam = await Exam.findByIdAndUpdate(
+
+      const exam = (await Exam.findByIdAndUpdate(
         examId,
         { $pull: { questions: new Types.ObjectId(questionId) } },
         updateOptions
-      )
+      )) as IExam | null
       return exam
     } catch (error) {
       logger.error('Error removing question from exam in repository', error)
@@ -367,10 +542,7 @@ export class ExamRepository implements IExamRepository {
       const count = await ExamAttempt.countDocuments({
         examId: new Types.ObjectId(examId),
         status: {
-          $in: [
-            EXAM_ATTEMPT_STATUS.IN_PROGRESS,
-            EXAM_ATTEMPT_STATUS.SUBMITTED,
-          ],
+          $in: [EXAM_ATTEMPT_STATUS.IN_PROGRESS, EXAM_ATTEMPT_STATUS.SUBMITTED],
         },
       })
       return count > 0

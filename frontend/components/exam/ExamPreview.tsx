@@ -69,6 +69,22 @@ export default function ExamPreview({
                 </span>
               </div>
             )}
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm">
+                <span className="font-medium">Pass Percentage:</span>{' '}
+                {examData.passPercentage}%
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm">
+                <span className="font-medium">Results:</span>{' '}
+                {examData.showResultsImmediately
+                  ? 'Shown immediately'
+                  : 'Hidden after submission'}
+              </span>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -93,16 +109,20 @@ export default function ExamPreview({
               </div>
 
               {(question.type === 'multiple-choice' ||
+                question.type === 'multi-choice' ||
                 question.type === 'multiple-select') && (
                 <div className="ml-6 space-y-2">
                   {question.options.map((option, optIndex) => {
                     const optIndexStr = optIndex.toString()
                     const isCorrect =
-                      question.type === 'multiple-choice'
-                        ? question.correctAnswer === optIndexStr
+                      question.type === 'multiple-choice' ||
+                      question.type === 'multi-choice'
+                        ? String(question.correctAnswer) === optIndexStr
                         : question.type === 'multiple-select'
                           ? Array.isArray(question.correctAnswer) &&
-                            question.correctAnswer.includes(optIndexStr)
+                            question.correctAnswer
+                              .map(String)
+                              .includes(optIndexStr)
                           : false
 
                     return (

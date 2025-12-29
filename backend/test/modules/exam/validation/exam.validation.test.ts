@@ -16,6 +16,7 @@ describe('Exam Validation Schemas', () => {
           availableAnytime: true,
           randomizeQuestions: false,
           showResultsImmediately: true,
+          passPercentage: 50,
         },
       }
 
@@ -37,6 +38,7 @@ describe('Exam Validation Schemas', () => {
           description: 'Test',
           duration: 60,
           availableAnytime: true,
+          passPercentage: 50,
         },
       }
 
@@ -55,6 +57,7 @@ describe('Exam Validation Schemas', () => {
           description: 'Test',
           duration: 0,
           availableAnytime: true,
+          passPercentage: 50,
         },
       }
 
@@ -73,6 +76,7 @@ describe('Exam Validation Schemas', () => {
           description: 'Test',
           duration: 2000,
           availableAnytime: true,
+          passPercentage: 50,
         },
       }
 

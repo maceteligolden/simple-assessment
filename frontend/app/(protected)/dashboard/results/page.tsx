@@ -27,6 +27,12 @@ export default function ResultsPage() {
     fetchResults(currentPage, 10)
   }, [currentPage, fetchResults])
 
+  useEffect(() => {
+    if (results && results.length > 0) {
+      console.log('My results list response:', results)
+    }
+  }, [results])
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',

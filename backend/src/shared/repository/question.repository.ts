@@ -2,14 +2,7 @@ import { injectable } from 'tsyringe'
 import { IQuestion, Question } from '../model/question.model'
 import { logger } from '../util/logger'
 import { Types, ClientSession } from 'mongoose'
-
-/**
- * Repository options for operations that support transactions and optimistic locking
- */
-export interface RepositoryOptions {
-  session?: ClientSession
-  expectedVersion?: number // For optimistic locking - expected version of the document
-}
+import { RepositoryOptions } from '../interfaces'
 
 /**
  * Question Repository Interface
@@ -29,6 +22,14 @@ export interface IQuestionRepository {
   ): Promise<IQuestion>
   findById(id: string, options?: RepositoryOptions): Promise<IQuestion | null>
   findByExamId(examId: string, options?: RepositoryOptions): Promise<IQuestion[]>
+  findByExamIdWithCorrectAnswers(
+    examId: string,
+    options?: RepositoryOptions
+  ): Promise<IQuestion[]>
+  findByExamIdForParticipant(
+    examId: string,
+    options?: RepositoryOptions
+  ): Promise<IQuestion[]>
   updateById(
     id: string,
     data: Partial<IQuestion>,
@@ -99,15 +100,83 @@ export class QuestionRepository implements IQuestionRepository {
     }
   }
 
-  async findByExamId(examId: string): Promise<IQuestion[]> {
+  async findByExamId(
+    examId: string,
+    options?: RepositoryOptions
+  ): Promise<IQuestion[]> {
     try {
       logger.debug('Finding questions by exam ID in repository', { examId })
-      const questions = await Question.find({
+      const query = Question.find({
         examId: new Types.ObjectId(examId),
-      }).sort({ order: 1 })
+      })
+        .select('_id type question options points order version')
+        .sort({ order: 1 })
+
+      if (options?.session) {
+        query.session(options.session)
+      }
+
+      const questions = await query
       return questions
     } catch (error) {
       logger.error('Error finding questions by exam ID in repository', error)
+      throw error
+    }
+  }
+
+  /**
+   * Find questions by exam ID with correct answers (for marking and results)
+   */
+  async findByExamIdWithCorrectAnswers(
+    examId: string,
+    options?: RepositoryOptions
+  ): Promise<IQuestion[]> {
+    try {
+      logger.debug(
+        'Finding questions by exam ID with correct answers in repository',
+        { examId }
+      )
+      const query = Question.find({
+        examId: new Types.ObjectId(examId),
+      })
+        .select('_id type question options points order version correctAnswer')
+        .sort({ order: 1 })
+
+      if (options?.session) {
+        query.session(options.session)
+      }
+
+      const questions = await query
+      return questions
+    } catch (error) {
+      logger.error(
+        'Error finding questions by exam ID with correct answers in repository',
+        error
+      )
+      throw error
+    }
+  }
+
+  /**
+   * Find questions by exam ID for participants (excludes correctAnswer)
+   */
+  async findByExamIdForParticipant(examId: string, options?: RepositoryOptions): Promise<IQuestion[]> {
+    try {
+      logger.debug('Finding questions by exam ID for participant in repository', { examId })
+      const query = Question.find({
+        examId: new Types.ObjectId(examId),
+      })
+        .select('_id type question options points order')
+        .sort({ order: 1 })
+      
+      if (options?.session) {
+        query.session(options.session)
+      }
+      
+      const questions = await query
+      return questions
+    } catch (error) {
+      logger.error('Error finding questions by exam ID for participant in repository', error)
       throw error
     }
   }

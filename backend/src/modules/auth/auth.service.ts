@@ -1,9 +1,10 @@
 import { injectable, inject } from 'tsyringe'
 import { IUserRepository } from '../../shared/repository/user.repository'
+import { IAuthCacheService } from './cache'
 import { ISessionService } from '../../shared/service/session.service'
 import { hashPassword, comparePassword } from '../../shared/util/password'
 import { generateTokens, verifyRefreshToken } from '../../shared/util/jwt'
-import { logger, TransactionManager } from '../../shared/util'
+import { logger, TransactionManager, Sanitizer } from '../../shared/util'
 import { extractIpAddress, extractUserAgent } from '../../shared/util/session'
 import {
   SignUpInput,
@@ -50,7 +51,9 @@ export class AuthService implements IAuthService {
     @inject('IUserRepository')
     private readonly userRepository: IUserRepository,
     @inject('ISessionService')
-    private readonly sessionService: ISessionService
+    private readonly sessionService: ISessionService,
+    @inject('IAuthCacheService')
+    private readonly authCache: IAuthCacheService
   ) {
     logger.debug('AuthService initialized')
   }
@@ -96,8 +99,8 @@ export class AuthService implements IAuthService {
 
       // Create user data
       const userData: CreateUserInput = {
-        firstName: data.firstName,
-        lastName: data.lastName,
+        firstName: Sanitizer.sanitize(data.firstName),
+        lastName: Sanitizer.sanitize(data.lastName),
         email: data.email,
         password: hashedPassword,
         role: data.role,
@@ -441,15 +444,17 @@ export class AuthService implements IAuthService {
    */
   async getUserById(userId: string): Promise<UserProfileOutput> {
     try {
-      logger.debug('Getting user by ID', { userId })
+      return this.authCache.wrapUserById(userId, async () => {
+        logger.debug('Fetching user by ID from DB (cache miss)', { userId })
 
-      const user = await this.userRepository.findById(userId)
-      if (!user) {
-        logger.warn('User not found', { userId })
-        throw new NotFoundError('User not found')
-      }
+        const user = await this.userRepository.findById(userId)
+        if (!user) {
+          logger.warn('User not found', { userId })
+          throw new NotFoundError('User not found')
+        }
 
-      return this.mapUserToResponse(user)
+        return this.mapUserToResponse(user)
+      })
     } catch (error) {
       logger.error('Error getting user by ID', error)
       throw error
@@ -462,17 +467,21 @@ export class AuthService implements IAuthService {
    */
   async searchUserByEmail(email: string): Promise<UserProfileOutput | null> {
     try {
-      logger.debug('Searching user by email', { email })
+      const normalizedEmail = email.toLowerCase().trim()
 
-      const user = await this.userRepository.findByEmail(
-        email.toLowerCase().trim()
-      )
-      if (!user) {
-        logger.debug('User not found by email', { email })
-        return null
-      }
+      return this.authCache.wrapUserByEmail(normalizedEmail, async () => {
+        logger.debug('Searching user by email from DB (cache miss)', {
+          email: normalizedEmail,
+        })
 
-      return this.mapUserToResponse(user)
+        const user = await this.userRepository.findByEmail(normalizedEmail)
+        if (!user) {
+          logger.debug('User not found by email', { email: normalizedEmail })
+          return null
+        }
+
+        return this.mapUserToResponse(user)
+      })
     } catch (error) {
       logger.error('Error searching user by email', error)
       throw error

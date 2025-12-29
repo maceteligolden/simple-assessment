@@ -56,6 +56,7 @@ export default function EditExamPage() {
         startDate: exam.startDate,
         endDate: exam.endDate,
         randomizeQuestions: exam.randomizeQuestions,
+        showResultsImmediately: exam.showResultsImmediately ?? true,
         passPercentage: exam.passPercentage || 50,
         questions: exam.questions.map(q => {
           // Map question from Exam format to CreateExamDto format
@@ -171,6 +172,7 @@ export default function EditExamPage() {
         startDate: exam.startDate,
         endDate: exam.endDate,
         randomizeQuestions: exam.randomizeQuestions,
+        showResultsImmediately: exam.showResultsImmediately ?? true,
         passPercentage: exam.passPercentage || 50,
         questions: exam.questions.map(q => {
           const questionText =

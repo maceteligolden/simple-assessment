@@ -7,13 +7,7 @@ import {
 } from '../../modules/auth/interfaces/auth.interface'
 import { logger } from '../util/logger'
 import { ClientSession } from 'mongoose'
-
-/**
- * Repository options for operations that support transactions
- */
-export interface RepositoryOptions {
-  session?: ClientSession
-}
+import { RepositoryOptions } from '../interfaces'
 
 /**
  * User Repository Interface

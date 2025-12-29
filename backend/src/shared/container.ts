@@ -37,6 +37,26 @@ import {
   IExamParticipantService,
   IExamAttemptService,
 } from '../modules/exam/interfaces'
+import {
+  ExamCacheService,
+  IExamCacheService,
+  ExamCacheInvalidator,
+} from '../modules/exam/cache'
+import {
+  ParticipantCacheService,
+  IParticipantCacheService,
+  ParticipantCacheInvalidator,
+} from '../modules/exam/cache/participant'
+import {
+  AttemptCacheService,
+  IAttemptCacheService,
+  AttemptCacheInvalidator,
+} from '../modules/exam/cache/attempt'
+import {
+  AuthCacheService,
+  IAuthCacheService,
+  AuthCacheInvalidator,
+} from '../modules/auth/cache'
 import { AuthController } from '../modules/auth/auth.controller'
 import {
   ExamController,
@@ -102,6 +122,40 @@ export function setupContainer(): void {
 
   container.register<IExamAttemptService>('IExamAttemptService', {
     useClass: ExamAttemptService,
+  })
+
+  // Register cache invalidators (they need ICacheService)
+  container.register<ExamCacheInvalidator>('ExamCacheInvalidator', {
+    useClass: ExamCacheInvalidator,
+  })
+
+  container.register<ParticipantCacheInvalidator>('ParticipantCacheInvalidator', {
+    useClass: ParticipantCacheInvalidator,
+  })
+
+  container.register<AttemptCacheInvalidator>('AttemptCacheInvalidator', {
+    useClass: AttemptCacheInvalidator,
+  })
+
+  container.register<AuthCacheInvalidator>('AuthCacheInvalidator', {
+    useClass: AuthCacheInvalidator,
+  })
+
+  // Register module cache services
+  container.register<IExamCacheService>('IExamCacheService', {
+    useClass: ExamCacheService,
+  })
+
+  container.register<IParticipantCacheService>('IParticipantCacheService', {
+    useClass: ParticipantCacheService,
+  })
+
+  container.register<IAttemptCacheService>('IAttemptCacheService', {
+    useClass: AttemptCacheService,
+  })
+
+  container.register<IAuthCacheService>('IAuthCacheService', {
+    useClass: AuthCacheService,
   })
 
   // Register controllers

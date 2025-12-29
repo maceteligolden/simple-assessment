@@ -11,25 +11,6 @@ import {
 } from '../util/jwt'
 
 /**
- * Extend Express Request to include session information
- * Note: user is required after authenticate middleware runs
- */
-declare global {
-  namespace Express {
-    interface Request {
-      user: JWTPayload
-      session?: {
-        id: string
-        userId: string
-        sessionToken: string
-        expiresAt: Date
-        lastActivity: Date
-      }
-    }
-  }
-}
-
-/**
  * Session Authentication Middleware
  * Verifies session token and attaches session information to request
  * Falls back to JWT token verification if session token is not provided

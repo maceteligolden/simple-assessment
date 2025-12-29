@@ -6,13 +6,7 @@ import {
 import { logger } from '../util/logger'
 import { Types, ClientSession } from 'mongoose'
 import { EXAM_ATTEMPT_STATUS } from '../constants'
-
-/**
- * Repository options for operations that support transactions
- */
-export interface RepositoryOptions {
-  session?: ClientSession
-}
+import { RepositoryOptions } from '../interfaces'
 
 /**
  * Exam Participant Repository Interface
@@ -96,14 +90,22 @@ export class ExamParticipantRepository implements IExamParticipantRepository {
     }
   }
 
-  async findByExamId(examId: string): Promise<IExamParticipant[]> {
+  async findByExamId(examId: string, options?: RepositoryOptions): Promise<IExamParticipant[]> {
     try {
       logger.debug('Finding exam participants by exam ID in repository', {
         examId,
       })
-      const participants = await ExamParticipant.find({
+      const query = ExamParticipant.find({
         examId: new Types.ObjectId(examId),
-      }).sort({ addedAt: -1 })
+      })
+        .select('_id email accessCode isUsed addedAt')
+        .sort({ addedAt: -1 })
+      
+      if (options?.session) {
+        query.session(options.session)
+      }
+      
+      const participants = await query
       return participants
     } catch (error) {
       logger.error(
@@ -114,14 +116,22 @@ export class ExamParticipantRepository implements IExamParticipantRepository {
     }
   }
 
-  async findByUserId(userId: string): Promise<IExamParticipant[]> {
+  async findByUserId(userId: string, options?: RepositoryOptions): Promise<IExamParticipant[]> {
     try {
       logger.debug('Finding exam participants by user ID in repository', {
         userId,
       })
-      const participants = await ExamParticipant.find({
+      const query = ExamParticipant.find({
         userId: new Types.ObjectId(userId),
-      }).sort({ addedAt: -1 })
+      })
+        .select('_id examId accessCode addedAt')
+        .sort({ addedAt: -1 })
+      
+      if (options?.session) {
+        query.session(options.session)
+      }
+      
+      const participants = await query
       return participants
     } catch (error) {
       logger.error(

@@ -81,15 +81,15 @@ export const searchUsersSchema = z.object({
 /**
  * Type exports for TypeScript
  */
-export type SignUpInput = z.infer<typeof signUpSchema>
-export type SignInInput = z.infer<typeof signInSchema>
-export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>
-export type SearchUsersInput = z.infer<typeof searchUsersSchema>
+export type SignUpSchemaType = z.infer<typeof signUpSchema>
+export type SignInSchemaType = z.infer<typeof signInSchema>
+export type RefreshTokenSchemaType = z.infer<typeof refreshTokenSchema>
+export type SearchUsersSchemaType = z.infer<typeof searchUsersSchema>
 
 /**
  * Validate sign up data
  */
-export function validateSignUp(data: unknown): SignUpInput {
+export function validateSignUp(data: unknown): SignUpSchemaType {
   try {
     return signUpSchema.parse(data)
   } catch (error) {
@@ -105,7 +105,7 @@ export function validateSignUp(data: unknown): SignUpInput {
 /**
  * Validate sign in data
  */
-export function validateSignIn(data: unknown): SignInInput {
+export function validateSignIn(data: unknown): SignInSchemaType {
   try {
     return signInSchema.parse(data)
   } catch (error) {

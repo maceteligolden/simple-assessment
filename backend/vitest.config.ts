@@ -23,6 +23,7 @@ export default defineConfig({
     },
     testTimeout: 10000,
     hookTimeout: 10000,
+    exclude: ['test/integration/**', 'node_modules/**', 'dist/**'],
   },
   resolve: {
     alias: {

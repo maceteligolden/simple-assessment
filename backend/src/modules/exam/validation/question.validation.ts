@@ -93,15 +93,7 @@ export const addQuestionSchema = z
       return true
     },
     {
-      message: (data) => {
-        if (data.body.type === 'multi-choice') {
-          return 'Correct answer must be a valid option index (0 to number of options - 1)'
-        }
-        if (data.body.type === 'multiple-select') {
-          return 'Correct answer must be an array of at least 2 valid option indices (0 to number of options - 1) with no duplicates'
-        }
-        return 'Invalid correct answer format'
-      },
+      message: 'Invalid correct answer format for the selected question type',
       path: ['body', 'correctAnswer'],
     }
   )

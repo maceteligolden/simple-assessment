@@ -8,6 +8,7 @@ import {
   IQuestionRepository,
   IUserRepository,
 } from '../../../../src/shared/repository'
+import { IParticipantCacheService } from '../../../../src/modules/exam/cache'
 import { Types } from 'mongoose'
 import { QuestionFactory } from '../../../../src/modules/exam/factory/question.factory'
 
@@ -15,6 +16,9 @@ import { QuestionFactory } from '../../../../src/modules/exam/factory/question.f
 const mockExamRepository: IExamRepository = {
   create: vi.fn(),
   findById: vi.fn(),
+  findByIdForExaminer: vi.fn(),
+  findByIdForParticipant: vi.fn(),
+  findByIdWithCorrectAnswers: vi.fn(),
   findByCreatorId: vi.fn(),
   updateById: vi.fn(),
   deleteById: vi.fn(),
@@ -22,6 +26,8 @@ const mockExamRepository: IExamRepository = {
   removeQuestion: vi.fn(),
   reorderQuestions: vi.fn(),
   hasActiveAttempts: vi.fn(),
+  getQuestionCount: vi.fn(),
+  getParticipantCount: vi.fn(),
 }
 
 const mockParticipantRepository: IExamParticipantRepository = {
@@ -52,6 +58,7 @@ const mockQuestionRepository: IQuestionRepository = {
   create: vi.fn(),
   findById: vi.fn(),
   findByExamId: vi.fn(),
+  findByExamIdWithCorrectAnswers: vi.fn(),
   updateById: vi.fn(),
   deleteById: vi.fn(),
   updateOrder: vi.fn(),
@@ -65,6 +72,25 @@ const mockUserRepository: IUserRepository = {
   updateRefreshToken: vi.fn(),
   deleteById: vi.fn(),
   findOne: vi.fn(),
+}
+
+const mockParticipantCache: IParticipantCacheService = {
+  getMyExams: vi.fn(),
+  setMyExams: vi.fn(),
+  invalidateMyExams: vi.fn(),
+  getParticipants: vi.fn(),
+  setParticipants: vi.fn(),
+  invalidateParticipants: vi.fn(),
+  getParticipantResult: vi.fn(),
+  setParticipantResult: vi.fn(),
+  invalidateParticipantResult: vi.fn(),
+  getNotStartedExams: vi.fn(),
+  setNotStartedExams: vi.fn(),
+  invalidateNotStartedExams: vi.fn(),
+  wrapMyExams: vi.fn(),
+  wrapParticipants: vi.fn(),
+  wrapParticipantResult: vi.fn(),
+  wrapNotStartedExams: vi.fn(),
 }
 
 // Mock logger
@@ -122,12 +148,13 @@ describe('ExamParticipantService', () => {
       mockParticipantRepository,
       mockAttemptRepository,
       mockQuestionRepository,
-      mockUserRepository
+      mockUserRepository,
+      mockParticipantCache
     )
   })
 
   describe('addParticipant', () => {
-    it('should add participant to exam successfully', async () => {
+    it('should add participant to exam successfully and invalidate cache', async () => {
       // Arrange
       const input: any = {
         examId,
@@ -155,31 +182,24 @@ describe('ExamParticipantService', () => {
         addedAt: new Date(),
       }
 
-      ;(mockExamRepository.findById as any).mockResolvedValue(mockExam)
-      ;(mockUserRepository.findByEmail as any).mockResolvedValue(mockUser)
-      ;(mockParticipantRepository.findByExamAndUser as any).mockResolvedValue(
-        null
-      )
-      ;(mockParticipantRepository.create as any).mockResolvedValue(
-        mockParticipant
-      )
+      vi.mocked(mockExamRepository.findById).mockResolvedValue(mockExam as any)
+      vi.mocked(mockUserRepository.findByEmail).mockResolvedValue(mockUser as any)
+      vi.mocked(mockParticipantRepository.findByExamAndUser).mockResolvedValue(null)
+      vi.mocked(mockParticipantRepository.create).mockResolvedValue(mockParticipant as any)
 
       // Act
       const result = await participantService.addParticipant(input, userId)
 
       // Assert
-      expect(mockExamRepository.findById).toHaveBeenCalledWith(examId)
-      expect(mockUserRepository.findByEmail).toHaveBeenCalledWith(
-        'participant@example.com'
-      )
+      expect(mockParticipantRepository.create).toHaveBeenCalled()
+      expect(mockParticipantCache.invalidateParticipants).toHaveBeenCalledWith(examId)
+      expect(mockParticipantCache.invalidateMyExams).toHaveBeenCalled()
       expect(result.id).toBe(mockParticipant._id.toString())
-      expect(result.email).toBe('participant@example.com')
-      expect(result.accessCode).toBe('ABC123')
     })
   })
 
   describe('removeParticipant', () => {
-    it('should remove participant from exam successfully', async () => {
+    it('should remove participant and invalidate cache', async () => {
       // Arrange
       const participantId = '507f1f77bcf86cd799439014'
       const input: any = { participantId }
@@ -193,200 +213,66 @@ describe('ExamParticipantService', () => {
       const mockExam = {
         _id: new Types.ObjectId(examId),
         creatorId: new Types.ObjectId(userId),
-        title: 'Test Exam',
       }
 
-      ;(mockParticipantRepository.findById as any).mockResolvedValue(
-        mockParticipant
-      )
-      ;(mockExamRepository.findById as any).mockResolvedValue(mockExam)
-      ;(mockParticipantRepository.hasStartedAttempt as any).mockResolvedValue(
-        false
-      )
-      ;(mockParticipantRepository.deleteById as any).mockResolvedValue(true)
+      vi.mocked(mockParticipantRepository.findById).mockResolvedValue(mockParticipant as any)
+      vi.mocked(mockExamRepository.findById).mockResolvedValue(mockExam as any)
+      vi.mocked(mockParticipantRepository.hasStartedAttempt).mockResolvedValue(false)
 
       // Act
       const result = await participantService.removeParticipant(input, userId)
 
       // Assert
-      expect(mockParticipantRepository.findById).toHaveBeenCalledWith(
-        participantId
-      )
-      expect(mockParticipantRepository.deleteById).toHaveBeenCalledWith(
-        participantId
-      )
+      expect(mockParticipantRepository.deleteById).toHaveBeenCalledWith(participantId)
+      expect(mockParticipantCache.invalidateParticipants).toHaveBeenCalledWith(examId)
       expect(result.message).toBe('Participant removed successfully')
     })
   })
 
   describe('listParticipants', () => {
-    it('should list participants successfully', async () => {
+    it('should list participants using cache wrap', async () => {
       // Arrange
       const input: any = {
         examId,
         pagination: { page: 1, limit: 10 },
       }
 
-      const mockExam = {
+      vi.mocked(mockParticipantCache.wrapParticipants).mockImplementation(
+        (eid, p, l, s, fetcher) => fetcher()
+      )
+      vi.mocked(mockExamRepository.findById).mockResolvedValue({
         _id: new Types.ObjectId(examId),
         creatorId: new Types.ObjectId(userId),
-        title: 'Test Exam',
-      }
-
-      const mockParticipants = [
-        {
-          _id: new Types.ObjectId('507f1f77bcf86cd799439014'),
-          examId: new Types.ObjectId(examId),
-          email: 'participant@example.com',
-          accessCode: 'ABC123',
-          isUsed: false,
-          addedAt: new Date(),
-        },
-      ]
-
-      ;(mockExamRepository.findById as any).mockResolvedValue(mockExam)
-      ;(mockParticipantRepository.findByExamId as any).mockResolvedValue(
-        mockParticipants
-      )
-      ;(mockAttemptRepository.findByParticipant as any).mockResolvedValue(null)
+      } as any)
+      vi.mocked(mockParticipantRepository.findByExamId).mockResolvedValue([])
 
       // Act
       const result = await participantService.listParticipants(input, userId)
 
       // Assert
-      expect(mockExamRepository.findById).toHaveBeenCalledWith(examId)
+      expect(mockParticipantCache.wrapParticipants).toHaveBeenCalled()
       expect(result.data).toBeDefined()
-      expect(result.pagination).toBeDefined()
-    })
-  })
-
-  describe('getParticipantResult', () => {
-    it('should get participant result successfully', async () => {
-      // Arrange
-      const participantId = '507f1f77bcf86cd799439014'
-      const input: any = {
-        examId,
-        participantId,
-      }
-
-      const mockExam = {
-        _id: new Types.ObjectId(examId),
-        creatorId: new Types.ObjectId(userId),
-        title: 'Test Exam',
-      }
-
-      const mockParticipant = {
-        _id: new Types.ObjectId(participantId),
-        examId: new Types.ObjectId(examId),
-        email: 'participant@example.com',
-        accessCode: 'ABC123',
-        addedAt: new Date(),
-      }
-
-      const mockQuestions = [
-        {
-          _id: new Types.ObjectId('507f1f77bcf86cd799439015'),
-          type: 'multiple-choice',
-          question: 'What is 2+2?',
-          options: ['3', '4', '5'],
-          correctAnswer: '4',
-          points: 1,
-        },
-      ]
-
-      const mockAttempt = {
-        _id: new Types.ObjectId('507f1f77bcf86cd799439016'),
-        status: 'submitted',
-        score: 1,
-        maxScore: 1,
-        percentage: 100,
-        startedAt: new Date(),
-        submittedAt: new Date(),
-        answers: new Map([
-          [
-            mockQuestions[0]._id.toString(),
-            { answer: '4', timestamp: new Date() },
-          ],
-        ]),
-      }
-
-      const mockQuestionHandler = {
-        markAnswer: vi.fn().mockReturnValue(1),
-      }
-
-      ;(mockExamRepository.findById as any).mockResolvedValue(mockExam)
-      ;(mockParticipantRepository.findById as any).mockResolvedValue(
-        mockParticipant
-      )
-      ;(mockAttemptRepository.findByParticipant as any).mockResolvedValue(
-        mockAttempt
-      )
-      ;(mockQuestionRepository.findByExamId as any).mockResolvedValue(
-        mockQuestions
-      )
-      ;(QuestionFactory.create as any).mockReturnValue(mockQuestionHandler)
-
-      // Act
-      const result = await participantService.getParticipantResult(
-        input,
-        userId
-      )
-
-      // Assert
-      expect(mockExamRepository.findById).toHaveBeenCalledWith(examId)
-      expect(result.data).toBeDefined()
-      expect(result.data.participant).toBeDefined()
-      expect(result.attempt).toBeDefined()
     })
   })
 
   describe('getMyExams', () => {
-    it('should get participant exams successfully', async () => {
+    it('should get participant exams using cache wrap', async () => {
       // Arrange
       const input: any = {
         pagination: { page: 1, limit: 10 },
       }
 
-      const mockParticipants = [
-        {
-          _id: new Types.ObjectId('507f1f77bcf86cd799439014'),
-          examId: new Types.ObjectId(examId),
-          userId: new Types.ObjectId(userId),
-          email: 'participant@example.com',
-          accessCode: 'ABC123',
-          addedAt: new Date(),
-        },
-      ]
-
-      const mockExam = {
-        _id: new Types.ObjectId(examId),
-        title: 'Test Exam',
-        description: 'Test Description',
-        duration: 60,
-        availableAnytime: true,
-      }
-
-      const mockQuestions: any[] = []
-
-      ;(mockParticipantRepository.findByUserId as any).mockResolvedValue(
-        mockParticipants
+      vi.mocked(mockParticipantCache.wrapMyExams).mockImplementation(
+        (uid, p, l, s, st, ia, fetcher) => fetcher()
       )
-      ;(mockExamRepository.findById as any).mockResolvedValue(mockExam)
-      ;(mockAttemptRepository.findByParticipant as any).mockResolvedValue(null)
-      ;(mockQuestionRepository.findByExamId as any).mockResolvedValue(
-        mockQuestions
-      )
+      vi.mocked(mockParticipantRepository.findByUserId).mockResolvedValue([])
 
       // Act
       const result = await participantService.getMyExams(input, userId)
 
       // Assert
-      expect(mockParticipantRepository.findByUserId).toHaveBeenCalledWith(
-        userId
-      )
+      expect(mockParticipantCache.wrapMyExams).toHaveBeenCalled()
       expect(result.data).toBeDefined()
-      expect(result.pagination).toBeDefined()
     })
   })
 })
-

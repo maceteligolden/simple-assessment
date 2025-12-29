@@ -17,6 +17,7 @@ export default function AttemptResultsPage() {
   useEffect(() => {
     if (attemptId) {
       fetchResults(attemptId).then(result => {
+        console.log('Exam results response:', result)
         if (result.success) {
           // Simulate marking delay
           setTimeout(() => {

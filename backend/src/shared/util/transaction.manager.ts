@@ -55,12 +55,18 @@ export class TransactionManager {
 
       return result
     } catch (error) {
-      // Abort transaction on any error
-      await session.abortTransaction()
-      logger.warn('Transaction aborted due to error', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      })
+      // Abort transaction on any error if it's still active
+      if (session.inTransaction()) {
+        await session.abortTransaction()
+        logger.warn('Transaction aborted due to error', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        })
+      } else {
+        logger.warn('Error occurred in transaction block, but transaction already finished', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
       throw error
     } finally {
       // Always end the session to free resources

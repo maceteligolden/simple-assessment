@@ -5,7 +5,8 @@ import {
   IExamParticipantRepository,
   IExamAttemptRepository,
 } from '../../../shared/repository'
-import { logger, paginateArray, TransactionManager } from '../../../shared/util'
+import { IAttemptCacheService, IParticipantCacheService } from '../cache'
+import { logger, paginateArray, TransactionManager, Sanitizer } from '../../../shared/util'
 import { EXAM_ATTEMPT_STATUS } from '../../../shared/constants'
 import {
   StartExamInput,
@@ -45,7 +46,11 @@ export class ExamAttemptService implements IExamAttemptService {
     @inject('IExamParticipantRepository')
     private readonly participantRepository: IExamParticipantRepository,
     @inject('IExamAttemptRepository')
-    private readonly attemptRepository: IExamAttemptRepository
+    private readonly attemptRepository: IExamAttemptRepository,
+    @inject('IAttemptCacheService')
+    private readonly attemptCache: IAttemptCacheService,
+    @inject('IParticipantCacheService')
+    private readonly participantCache: IParticipantCacheService
   ) {
     logger.debug('ExamAttemptService initialized')
   }
@@ -169,6 +174,9 @@ export class ExamAttemptService implements IExamAttemptService {
         questionOrder = this.shuffleArray([...questionOrder])
       }
 
+      const startedAt = new Date()
+      const durationSeconds = exam.duration * 60
+
       // Use transaction to ensure atomicity: create attempt + mark participant as used + update status
       const updatedAttempt = await TransactionManager.withTransaction(
         async session => {
@@ -189,9 +197,7 @@ export class ExamAttemptService implements IExamAttemptService {
             { session }
           )
 
-          // 3. Start attempt - update status (with session)
-          const startedAt = new Date()
-          const durationSeconds = exam.duration * 60
+      // 3. Start attempt - update status (with session)
           const updated = await this.attemptRepository.updateById(
             attempt._id.toString(),
             {
@@ -215,6 +221,11 @@ export class ExamAttemptService implements IExamAttemptService {
         attemptId: updatedAttempt._id.toString(),
         examId: exam._id.toString(),
       })
+
+      // Invalidate participant caches
+      await this.participantCache.invalidateMyExams(userId)
+      await this.participantCache.invalidateNotStartedExams(userId)
+      await this.participantCache.invalidateParticipants(exam._id.toString())
 
       return {
         attemptId: updatedAttempt._id.toString(),
@@ -278,7 +289,7 @@ export class ExamAttemptService implements IExamAttemptService {
       // Update activity
       await this.attemptRepository.updateActivity(attempt._id.toString())
 
-      // Get exam
+      // Get exam (only need basic info for question retrieval)
       const exam = await this.examRepository.findById(
         this.getExamIdString(attempt)
       )
@@ -286,8 +297,8 @@ export class ExamAttemptService implements IExamAttemptService {
         throw new NotFoundError('Exam not found')
       }
 
-      // Get questions
-      const questions = await this.questionRepository.findByExamId(
+      // Get questions for participant (excludes correctAnswer for security)
+      const questions = await this.questionRepository.findByExamIdForParticipant(
         exam._id.toString()
       )
 
@@ -415,11 +426,14 @@ export class ExamAttemptService implements IExamAttemptService {
         )
       }
 
+      // Sanitize answer
+      const sanitizedAnswer = Sanitizer.sanitizeObject(data.answer)
+
       // Update answer
       await this.attemptRepository.updateAnswer(
         attempt._id.toString(),
         question._id.toString(),
-        data.answer
+        sanitizedAnswer
       )
 
       // Update activity
@@ -507,7 +521,7 @@ export class ExamAttemptService implements IExamAttemptService {
         throw new NotFoundError('Exam not found')
       }
 
-      const questions = await this.questionRepository.findByExamId(
+      const questions = await this.questionRepository.findByExamIdWithCorrectAnswers(
         exam._id.toString()
       )
 
@@ -558,6 +572,21 @@ export class ExamAttemptService implements IExamAttemptService {
         maxScore: markingResult.maxScore,
       })
 
+      // Invalidate caches
+      await this.attemptCache.invalidateAttemptResults(
+        updatedAttempt._id.toString()
+      )
+      await this.attemptCache.invalidateMyResults(userId)
+      await this.participantCache.invalidateMyExams(userId)
+      await this.participantCache.invalidateParticipants(
+        this.getExamIdString(updatedAttempt)
+      )
+      // Invalidate participant detailed result for examiner
+      await this.participantCache.invalidateParticipantResult(
+        this.getExamIdString(updatedAttempt),
+        updatedAttempt.participantId.toString()
+      )
+
       return {
         attemptId: updatedAttempt._id.toString(),
         score: markingResult.score,
@@ -579,127 +608,191 @@ export class ExamAttemptService implements IExamAttemptService {
     userId: string
   ): Promise<GetAttemptResultsOutput> {
     try {
-      logger.debug('Getting attempt results', {
-        attemptId: data.attemptId,
-        userId,
-      })
-
-      const attempt = await this.attemptRepository.findById(data.attemptId)
-
-      if (!attempt) {
-        throw new NotFoundError('Exam attempt not found')
-      }
-
-      // Verify user owns this attempt
-      if (attempt.userId.toString() !== userId) {
-        throw new ForbiddenError(
-          'You do not have permission to view these results'
-        )
-      }
-
-      // Check if exam is submitted
-      if (attempt.status !== EXAM_ATTEMPT_STATUS.SUBMITTED) {
-        throw new BadRequestError('Exam has not been submitted yet')
-      }
-
-      // Get exam
-      const exam = await this.examRepository.findById(
-        this.getExamIdString(attempt)
-      )
-      if (!exam) {
-        throw new NotFoundError('Exam not found')
-      }
-
-      // Get questions
-      const questions = await this.questionRepository.findByExamId(
-        exam._id.toString()
-      )
-
-      // Build results with answer details
-      const answerDetails = await Promise.all(
-        questions.map(async (question: IQuestion) => {
-          const userAnswer = attempt.answers.get(question._id.toString())
-          const questionHandler = QuestionFactory.create(question.type)
-
-          // Mark the answer with options to handle index-based answers
-          const earnedPoints = userAnswer
-            ? questionHandler.markAnswer(
-                userAnswer.answer,
-                question.correctAnswer,
-                question.points,
-                question.options // Pass options for index-based answer conversion
-              )
-            : 0
-
-          // Convert user answer from index to text if needed (for display)
-          let displayUserAnswer: string | string[]
-          if (userAnswer?.answer) {
-            const answerStr = String(userAnswer.answer).trim()
-            const answerIndex = parseInt(answerStr, 10)
-            const isIndexAnswer =
-              !isNaN(answerIndex) &&
-              answerIndex.toString() === answerStr &&
-              /^\d+$/.test(answerStr)
-
-            if (
-              isIndexAnswer &&
-              question.options &&
-              question.options.length > 0
-            ) {
-              // Convert index to option text
-              if (answerIndex >= 0 && answerIndex < question.options.length) {
-                displayUserAnswer = question.options[answerIndex]
-              } else {
-                displayUserAnswer = answerStr // Fallback to index if out of range
-              }
-            } else {
-              // Already text, use as-is
-              displayUserAnswer = answerStr
-            }
-          } else {
-            displayUserAnswer = 'Not answered'
-          }
-
-          // Normalize correctAnswer to match interface (string | string[])
-          let normalizedCorrectAnswer: string | string[]
-          if (
-            typeof question.correctAnswer === 'string' ||
-            Array.isArray(question.correctAnswer)
-          ) {
-            normalizedCorrectAnswer = question.correctAnswer
-          } else {
-            normalizedCorrectAnswer = JSON.stringify(question.correctAnswer)
-          }
-
-          return {
-            questionId: question._id.toString(),
-            question:
-              typeof question.question === 'string'
-                ? question.question
-                : JSON.stringify(question.question),
-            userAnswer: displayUserAnswer, // Use converted text instead of index
-            correctAnswer: normalizedCorrectAnswer,
-            isCorrect: earnedPoints === question.points,
-            points: question.points,
-            earnedPoints,
-          }
+      return this.attemptCache.wrapAttemptResults(data.attemptId, async () => {
+        logger.debug('Fetching attempt results from DB (cache miss)', {
+          attemptId: data.attemptId,
+          userId,
         })
-      )
 
-      const percentage = attempt.percentage || 0
-      const passed = percentage >= exam.passPercentage
+        const attempt = await this.attemptRepository.findById(data.attemptId)
 
-      return {
-        attemptId: attempt._id.toString(),
-        examId: exam._id.toString(),
-        score: attempt.score || 0,
-        maxScore: attempt.maxScore || 0,
-        percentage,
-        passed,
-        passPercentage: exam.passPercentage,
-        submittedAt: attempt.submittedAt!.toISOString(),
-        answers: answerDetails,
-      }
+        if (!attempt) {
+          throw new NotFoundError('Exam attempt not found')
+        }
+
+        // Verify user owns this attempt
+        if (attempt.userId.toString() !== userId) {
+          throw new ForbiddenError(
+            'You do not have permission to view these results'
+          )
+        }
+
+        // Check if exam is submitted
+        if (attempt.status !== EXAM_ATTEMPT_STATUS.SUBMITTED) {
+          throw new BadRequestError('Exam has not been submitted yet')
+        }
+
+        // Get exam
+        // Get exam with correct answers for results display
+        const exam = await this.examRepository.findByIdWithCorrectAnswers(
+          this.getExamIdString(attempt)
+        )
+        if (!exam) {
+          throw new NotFoundError('Exam not found')
+        }
+
+        // Get questions with correct answers for marking and results display
+        const questions = await this.questionRepository.findByExamIdWithCorrectAnswers(
+          exam._id.toString()
+        )
+
+        logger.debug('Fetched questions for results', {
+          count: questions.length,
+          attemptAnswersCount: attempt.answers.size,
+        })
+
+        // Build results with answer details
+        const answerDetails = await Promise.all(
+          questions.map(async (question: IQuestion) => {
+            const userAnswer = attempt.answers.get(question._id.toString())
+            const questionHandler = QuestionFactory.create(question.type)
+
+            logger.debug('Processing question result', {
+              questionId: question._id.toString(),
+              hasUserAnswer: !!userAnswer,
+              userAnswer: userAnswer?.answer,
+              correctAnswer: question.correctAnswer,
+            })
+
+            // Mark the answer with options to handle index-based answers
+            const earnedPoints = userAnswer
+              ? questionHandler.markAnswer(
+                  userAnswer.answer,
+                  question.correctAnswer,
+                  question.points,
+                  question.options // Pass options for index-based answer conversion
+                )
+              : 0
+
+            logger.debug('Marking result for question', {
+              questionId: question._id.toString(),
+              earnedPoints,
+              maxPoints: question.points,
+              isCorrect: earnedPoints === question.points,
+            })
+
+            // Convert user answer from index to text if needed (for display)
+            let displayUserAnswer: string | string[]
+            if (userAnswer?.answer) {
+              const answers = Array.isArray(userAnswer.answer)
+                ? userAnswer.answer
+                : [userAnswer.answer]
+
+              const mappedAnswers = answers.map(ans => {
+                const answerStr = String(ans).trim()
+                const answerIndex = parseInt(answerStr, 10)
+                const isIndexAnswer =
+                  !isNaN(answerIndex) &&
+                  answerIndex.toString() === answerStr &&
+                  /^\d+$/.test(answerStr)
+
+                if (
+                  isIndexAnswer &&
+                  question.options &&
+                  question.options.length > 0 &&
+                  answerIndex >= 0 &&
+                  answerIndex < question.options.length
+                ) {
+                  return question.options[answerIndex]
+                }
+                return answerStr
+              })
+
+              displayUserAnswer = Array.isArray(userAnswer.answer)
+                ? mappedAnswers
+                : mappedAnswers[0]
+            } else {
+              displayUserAnswer = 'Not answered'
+            }
+
+            // Normalize correctAnswer to match interface (string | string[]) and convert to text for display
+            let normalizedCorrectAnswer: string | string[]
+            const rawCorrectAnswer = question.correctAnswer
+            if (
+              typeof rawCorrectAnswer === 'string' ||
+              Array.isArray(rawCorrectAnswer)
+            ) {
+              const correctAnswers = Array.isArray(rawCorrectAnswer)
+                ? rawCorrectAnswer
+                : [rawCorrectAnswer]
+
+              const mappedCorrectAnswers = correctAnswers.map(ans => {
+                const answerStr = String(ans).trim()
+                const answerIndex = parseInt(answerStr, 10)
+                const isIndexAnswer =
+                  !isNaN(answerIndex) &&
+                  answerIndex.toString() === answerStr &&
+                  /^\d+$/.test(answerStr)
+
+                if (
+                  isIndexAnswer &&
+                  question.options &&
+                  question.options.length > 0 &&
+                  answerIndex >= 0 &&
+                  answerIndex < question.options.length
+                ) {
+                  return question.options[answerIndex]
+                }
+                return answerStr
+              })
+
+              normalizedCorrectAnswer = Array.isArray(rawCorrectAnswer)
+                ? mappedCorrectAnswers
+                : mappedCorrectAnswers[0]
+            } else {
+              normalizedCorrectAnswer = JSON.stringify(rawCorrectAnswer)
+            }
+
+            const result = {
+              questionId: question._id.toString(),
+              question:
+                typeof question.question === 'string'
+                  ? question.question
+                  : JSON.stringify(question.question),
+              userAnswer: displayUserAnswer, // Use converted text instead of index
+              correctAnswer: normalizedCorrectAnswer,
+              isCorrect: earnedPoints === question.points,
+              points: question.points,
+              earnedPoints,
+            }
+
+            logger.debug('Built question result detail', {
+              questionId: result.questionId,
+              isCorrect: result.isCorrect,
+              earnedPoints: result.earnedPoints,
+              userAnswer: result.userAnswer,
+              correctAnswer: result.correctAnswer,
+            })
+
+            return result
+          })
+        )
+
+        const percentage = attempt.percentage || 0
+        const passed = percentage >= exam.passPercentage
+
+        return {
+          attemptId: attempt._id.toString(),
+          examId: exam._id.toString(),
+          score: attempt.score || 0,
+          maxScore: attempt.maxScore || 0,
+          percentage,
+          passed,
+          passPercentage: exam.passPercentage,
+          submittedAt: attempt.submittedAt!.toISOString(),
+          answers: answerDetails,
+        }
+      })
     } catch (error) {
       logger.error('Error getting attempt results', error)
       throw error
@@ -714,68 +807,70 @@ export class ExamAttemptService implements IExamAttemptService {
     userId: string
   ): Promise<GetMyResultsOutput> {
     try {
-      logger.debug('Getting my results', { userId })
-
-      // Use pagination from input
       const { pagination: paginationParams } = data
+      const page = paginationParams.page || 1
+      const limit = paginationParams.limit || 10
 
-      const attempts = await this.attemptRepository.findByUserId(userId)
+      return this.attemptCache.wrapMyResults(userId, page, limit, async () => {
+        logger.debug('Fetching my results from DB (cache miss)', { userId })
 
-      logger.debug('Found attempts for user', {
-        userId,
-        totalAttempts: attempts.length,
-        attemptsStatuses: attempts.map((a: IExamAttempt) => ({
-          attemptId: a._id.toString(),
-          status: a.status,
-          submittedAt: a.submittedAt,
-        })),
-      })
+        const attempts = await this.attemptRepository.findByUserId(userId)
 
-      // Filter only submitted attempts
-      const submittedAttempts = attempts.filter(
-        (attempt: IExamAttempt) =>
-          attempt.status === EXAM_ATTEMPT_STATUS.SUBMITTED
-      )
-
-      logger.debug('Filtered submitted attempts', {
-        userId,
-        totalAttempts: attempts.length,
-        submittedCount: submittedAttempts.length,
-      })
-
-      // Get exam details for each attempt
-      const results = await Promise.all(
-        submittedAttempts.map(async (attempt: IExamAttempt) => {
-          const exam = await this.examRepository.findById(
-            this.getExamIdString(attempt)
-          )
-
-          const percentage = attempt.percentage || 0
-          const passPercentage = exam?.passPercentage || 0
-          const passed = percentage >= passPercentage
-
-          return {
-            attemptId: attempt._id.toString(),
-            examId: attempt.examId.toString(),
-            examTitle: exam?.title || 'Unknown Exam',
-            score: attempt.score || 0,
-            maxScore: attempt.maxScore || 0,
-            percentage,
-            passed,
-            passPercentage,
-            submittedAt: attempt.submittedAt!.toISOString(),
-            status: attempt.status,
-          }
+        logger.debug('Found attempts for user', {
+          userId,
+          totalAttempts: attempts.length,
+          attemptsStatuses: attempts.map((a: IExamAttempt) => ({
+            attemptId: a._id.toString(),
+            status: a.status,
+            submittedAt: a.submittedAt,
+          })),
         })
-      )
 
-      // Paginate the results
-      const paginatedResult = paginateArray(results, paginationParams)
+        // Filter only submitted attempts
+        const submittedAttempts = attempts.filter(
+          (attempt: IExamAttempt) =>
+            attempt.status === EXAM_ATTEMPT_STATUS.SUBMITTED
+        )
 
-      return {
-        data: paginatedResult.data,
-        pagination: paginatedResult.pagination,
-      }
+        logger.debug('Filtered submitted attempts', {
+          userId,
+          totalAttempts: attempts.length,
+          submittedCount: submittedAttempts.length,
+        })
+
+        // Get exam details for each attempt (optimized - only need title and passPercentage)
+        const results = await Promise.all(
+          submittedAttempts.map(async (attempt: IExamAttempt) => {
+            // Attempt already has examId populated with selected fields
+            const exam = attempt.examId as any
+
+            const percentage = attempt.percentage || 0
+            const passPercentage = exam?.passPercentage || 0
+            const passed = percentage >= passPercentage
+
+            return {
+              attemptId: attempt._id.toString(),
+              examId: attempt.examId.toString(),
+              examTitle: exam?.title || 'Unknown Exam',
+              score: attempt.score || 0,
+              maxScore: attempt.maxScore || 0,
+              percentage,
+              passed,
+              passPercentage,
+              submittedAt: attempt.submittedAt!.toISOString(),
+              status: attempt.status,
+            }
+          })
+        )
+
+        // Paginate the results
+        const paginatedResult = paginateArray(results, paginationParams)
+
+        return {
+          data: paginatedResult.data,
+          pagination: paginatedResult.pagination,
+        }
+      })
     } catch (error) {
       logger.error('Error getting my results', error)
       throw error
